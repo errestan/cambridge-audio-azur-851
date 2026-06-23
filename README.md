@@ -1,12 +1,10 @@
 # Cambridge Audio Azur 851 — Home Assistant Integration
 
-<!-- Replace `your-org` (and @your-handle in manifest.json) with your GitHub
-     repo once published; the badges resolve after the first push & release. -->
-[![CI](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/ci.yml)
-[![Validate](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/validate.yml/badge.svg)](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/validate.yml)
-[![Latest release](https://img.shields.io/github/v/release/your-org/cambridge-audio-azur-851?sort=semver)](https://github.com/your-org/cambridge-audio-azur-851/releases)
+[![CI](https://github.com/errestan/cambridge-audio-azur-851/actions/workflows/ci.yml/badge.svg)](https://github.com/errestan/cambridge-audio-azur-851/actions/workflows/ci.yml)
+[![Validate](https://github.com/errestan/cambridge-audio-azur-851/actions/workflows/validate.yml/badge.svg)](https://github.com/errestan/cambridge-audio-azur-851/actions/workflows/validate.yml)
+[![Latest release](https://img.shields.io/github/v/release/errestan/cambridge-audio-azur-851?sort=semver)](https://github.com/errestan/cambridge-audio-azur-851/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
-[![License: MIT](https://img.shields.io/github/license/your-org/cambridge-audio-azur-851)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/errestan/cambridge-audio-azur-851)](LICENSE)
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration for controlling
 **Cambridge Audio Azur 851 series** audio equipment over RS-232 serial.

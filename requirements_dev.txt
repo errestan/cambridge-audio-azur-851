@@ -1,10 +1,15 @@
 # Development & test dependencies.
-# Pin to versions compatible with the targeted Home Assistant release.
-homeassistant>=2025.1.0
-pytest>=8.0
-pytest-homeassistant-custom-component>=0.13
-pytest-asyncio>=0.23
-pytest-cov>=5.0
-ruff>=0.6
-mypy>=1.10
+#
+# pytest-homeassistant-custom-component pins an exact Home Assistant release and
+# the full test toolchain (pytest, pytest-asyncio, pytest-cov, etc.), so we pin
+# it and let it own those. Keep `homeassistant` matching the version it pins.
+# Requires Python >= 3.14.
+pytest-homeassistant-custom-component==0.13.340
+homeassistant==2026.6.4
+
+# Runtime dependency (also declared in manifest.json).
 serialx>=1.8.2   # serial transport (local / socket:// / esphome:// proxy)
+
+# Linters (run via pre-commit in CI; listed here for local convenience).
+ruff>=0.15
+mypy>=1.14

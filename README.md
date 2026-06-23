@@ -32,11 +32,10 @@ The Azur 851 series shares a common RS-232 control protocol. Target devices:
 
 ## How it connects
 
-These devices expose a 3-wire RS-232 port. Rather than requiring the serial port to
-be physically attached to the Home Assistant host, this integration connects through
-**Home Assistant's serial proxy support** (network-shared serial ports). This lets the
-hardware live anywhere on the network behind a serial-to-network bridge (e.g. an
-ESPHome device, ser2net, or a USB-serial server).
+These devices expose a 3-wire RS-232 port. The integration can talk to it over a
+**local serial port** or, using **Home Assistant's serial proxy support**
+(HA 2026.5+), over the network — so the hardware can live anywhere behind a
+serial-to-network bridge (e.g. an ESPHome device, ser2net, or a USB-serial server).
 
 ```
 +----------------+        network         +------------------+    RS-232    +-----------+
@@ -61,9 +60,9 @@ unsolicited, the connection runs a background read loop and the integration is
 custom_components/cambridge_azur851/
 ├── __init__.py          # Integration setup: config entry load/unload, platform forwarding
 ├── manifest.json        # Integration metadata & dependencies
-├── const.py             # Domain, defaults, config keys
-├── config_flow.py       # UI-driven setup (connection details, model selection)
-├── coordinator.py       # DataUpdateCoordinator: polls device state, pushes updates
+├── const.py             # Domain, config keys, supported models
+├── config_flow.py       # UI setup + reconfigure flow (port picker, model, optional key)
+├── coordinator.py       # Push coordinator: owns the connection, fans out updates
 ├── entity.py            # Shared base entity (device info, availability)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
 ├── strings.json         # UI strings
@@ -71,22 +70,25 @@ custom_components/cambridge_azur851/
 │   └── en.json
 └── azur851/             # Standalone protocol library (no HA imports)
     ├── __init__.py      # Public client API
-    ├── connection.py    # Transport: serial-proxy / serial I/O
+    ├── connection.py    # serialx transport: read loop, auto-reconnect, discovery
     ├── protocol.py      # Frame encode/decode for the Azur RS-232 protocol
     ├── commands.py      # Command & response definitions (command groups)
-    └── models.py        # Per-model capability maps
+    ├── models.py        # Per-model capability maps + device state
+    └── exceptions.py    # Library exception types
 ```
 
 **Design principles**
 
 - The `azur851/` package has **no Home Assistant imports** — it is a pure protocol
   client that can be tested and used independently.
-- All device polling goes through a single `DataUpdateCoordinator` so the serial link
-  is accessed serially (one in-flight request at a time).
-- Per-model differences (which commands/sources exist) live in `models.py`, keyed by
-  the model selected during config flow.
+- **Push, not poll.** The device emits state changes unsolicited (group-4 frames),
+  so a single connection owns the serial link with a background read loop; writes
+  are serialized behind a lock. The coordinator turns pushed updates into entity
+  state, and a dropped link auto-reconnects with backoff (`local_push`).
+- Per-model differences (baud rate, volume range, sources) live in `models.py`,
+  keyed by the model selected during config flow.
 
-## Installation (planned)
+## Installation
 
 ### HACS (custom repository)
 1. Add this repository as a custom repository in HACS (category: *Integration*).
@@ -97,11 +99,18 @@ custom_components/cambridge_azur851/
 ### Manual
 Copy `custom_components/cambridge_azur851/` into your Home Assistant `config/custom_components/` directory and restart.
 
+When adding the integration, choose the model and pick a detected serial port or
+type a connection URL (`/dev/ttyUSB0`, `socket://host:port`, or
+`esphome://host:6053/?port_name=…`); for an encrypted ESPHome proxy, also supply
+the encryption key. You can change any of these later via the entry's
+**Reconfigure** menu.
+
 ## Development
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Python 3.14+
 pip install -r requirements_dev.txt
+pre-commit install
 pytest
 ```
 

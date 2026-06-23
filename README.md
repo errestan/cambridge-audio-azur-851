@@ -97,14 +97,15 @@ See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps
 
 ## Roadmap
 
+- [x] Encode the official Azur 851 RS-232 protocol (`protocol.py`, `commands.py`) — see [`docs/protocol.md`](docs/protocol.md)
+- [x] Per-model capability maps in `models.py` (851A/851E baud + volume verified)
+- [x] Flesh out `media_player.py` (power, volume, mute, source, state mapping)
+- [x] Protocol round-trip tests
 - [ ] Confirm serial-proxy connection API for the target HA version
-- [ ] Obtain & encode the official Azur 851 RS-232 command reference (`protocol.py`, `commands.py`)
-- [ ] Implement `connection.py` transport with reconnect handling
-- [ ] Implement `coordinator.py` polling + optional unsolicited-update parsing
-- [ ] Flesh out `media_player.py` (power, volume, mute, source, state mapping)
-- [ ] Config flow validation (test connection during setup)
-- [ ] Per-model capability maps in `models.py`
-- [ ] Tests: protocol round-trip, config flow, coordinator
+- [ ] Implement `connection.py` transport (open + read loop, reconnect handling)
+- [ ] Switch to a push model: parse unsolicited group-4 updates (consider `local_push`)
+- [ ] Config flow validation against real hardware
+- [ ] Tests: config flow, coordinator
 - [ ] HACS validation & GitHub Actions (hassfest, HACS action)
 
 ## License

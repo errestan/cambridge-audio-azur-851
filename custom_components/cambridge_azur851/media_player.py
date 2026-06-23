@@ -55,54 +55,58 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
     @property
     def state(self) -> MediaPlayerState | None:
         """Return the current power state."""
-        # TODO: map DeviceState.power -> ON/OFF/STANDBY.
-        return None
+        power_on = self.coordinator.data.power_on
+        if power_on is None:
+            return None
+        return MediaPlayerState.ON if power_on else MediaPlayerState.STANDBY
 
     @property
     def volume_level(self) -> float | None:
         """Return volume level in the 0..1 range."""
-        # TODO: scale DeviceState.volume to 0..1.
-        return None
+        return self.coordinator.client.scale_from_device(
+            self.coordinator.data.volume_raw
+        )
 
     @property
     def is_volume_muted(self) -> bool | None:
         """Return True if volume is muted."""
-        return None
+        return self.coordinator.data.muted
 
     @property
     def source(self) -> str | None:
         """Return the currently selected source."""
-        return None
+        return self.coordinator.client.capabilities.source_name(
+            self.coordinator.data.source_code
+        )
 
     @property
-    def source_list(self) -> list[str] | None:
+    def source_list(self) -> list[str]:
         """Return the list of selectable sources for this model."""
-        # TODO: read from the model capability map.
-        return None
+        return list(self.coordinator.client.capabilities.sources)
 
     # --- Commands (write through the client) -------------------------------
 
     async def async_turn_on(self) -> None:
         """Turn the device on."""
-        # TODO: await self.coordinator.client.async_power(True)
+        await self.coordinator.client.async_power(True)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self) -> None:
         """Put the device into standby."""
-        # TODO: await self.coordinator.client.async_power(False)
+        await self.coordinator.client.async_power(False)
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set the volume (0..1)."""
-        # TODO: await self.coordinator.client.async_set_volume(volume)
+        await self.coordinator.client.async_set_volume(volume)
         await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute."""
-        # TODO: await self.coordinator.client.async_mute(mute)
+        await self.coordinator.client.async_mute(mute)
         await self.coordinator.async_request_refresh()
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source."""
-        # TODO: await self.coordinator.client.async_select_source(source)
+        await self.coordinator.client.async_select_source(source)
         await self.coordinator.async_request_refresh()

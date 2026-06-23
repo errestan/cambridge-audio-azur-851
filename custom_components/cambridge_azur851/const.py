@@ -15,8 +15,10 @@ CONF_PORT: Final = "port"  # serial-proxy / network bridge TCP port
 CONF_SERIAL_URL: Final = "serial_url"  # alternative: explicit serial/socket URL
 
 # --- Defaults --------------------------------------------------------------
-# RS-232 line settings for the Azur 851 series.
-# TODO: confirm against the official RS-232 documentation.
+# RS-232 line settings. Baud is model-dependent (851A=9600, 851E=115200, ...);
+# the authoritative per-model values live in azur851/models.py. This is only a
+# fallback for unknown models. All models use 8 data bits, no parity, 1 stop
+# bit, no handshake.
 DEFAULT_BAUDRATE: Final = 9600
 DEFAULT_PORT: Final = 4001
 DEFAULT_SCAN_INTERVAL_SECONDS: Final = 30

@@ -3,10 +3,10 @@
     "step": {
       "user": {
         "title": "Cambridge Audio Azur 851",
-        "description": "Enter the model and the serial connection URL. Examples: a local port `/dev/ttyUSB0`, a network bridge `socket://192.168.1.50:4001`, or an ESPHome serial proxy `esphome://192.168.1.42:6053/?port_name=851A`.",
+        "description": "Choose the model, then pick a detected serial port or type a connection URL. Examples: a local port `/dev/ttyUSB0`, a network bridge `socket://192.168.1.50:4001`, or an ESPHome serial proxy `esphome://192.168.1.42:6053/?port_name=851A`.",
         "data": {
           "model": "Model",
-          "serial_url": "Serial URL"
+          "serial_url": "Serial port or URL"
         }
       }
     },

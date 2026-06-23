@@ -6,10 +6,14 @@ These drive a fake serialx link and do not require real hardware.
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 import serialx
-from custom_components.cambridge_azur851.azur851.connection import Azur851Connection
+from custom_components.cambridge_azur851.azur851.connection import (
+    Azur851Connection,
+    async_discover_ports,
+)
 
 
 class _FakeWriter:
@@ -103,3 +107,61 @@ async def test_close_stops_reconnect(fake_serial) -> None:
     assert conn._closing is True
     assert conn.is_open is False
     assert calls["count"] == count_after_close
+
+
+async def test_discover_ports_dedup_and_labels(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Discovery merges platforms, dedups by device, and builds labels."""
+    device = SimpleNamespace(
+        device="/dev/ttyUSB0",
+        resolved_device="/dev/ttyUSB0",
+        manufacturer="FTDI",
+        product="FT232R",
+        description="ttyUSB0",
+    )
+    proxy = SimpleNamespace(
+        device="esphome://1.2.3.4:6053/?port_name=851A",
+        resolved_device="esphome://1.2.3.4:6053/?port_name=851A",
+        manufacturer=None,
+        product=None,
+        description="851A",
+    )
+
+    async def _list(platform):
+        if platform is serialx.Platform.DEVICE:
+            return [device, device]  # duplicate to exercise dedup
+        if platform is serialx.Platform.ESPHOME:
+            return [proxy]
+        return []
+
+    monkeypatch.setattr(serialx, "async_list_serial_ports", _list)
+    ports = await async_discover_ports()
+
+    assert [p.device for p in ports] == [
+        "/dev/ttyUSB0",
+        "esphome://1.2.3.4:6053/?port_name=851A",
+    ]
+    assert ports[0].label == "FTDI FT232R (/dev/ttyUSB0)"
+    assert ports[1].label == "851A (esphome://1.2.3.4:6053/?port_name=851A)"
+
+
+async def test_discover_ports_swallows_platform_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A platform with no registered handler is skipped, not fatal."""
+
+    async def _list(platform):
+        if platform is serialx.Platform.DEVICE:
+            return [
+                SimpleNamespace(
+                    device="/dev/ttyS0",
+                    description="ttyS0",
+                    manufacturer=None,
+                    product=None,
+                )
+            ]
+        raise serialx.SerialException("no handler for this scheme")
+
+    monkeypatch.setattr(serialx, "async_list_serial_ports", _list)
+    ports = await async_discover_ports()
+
+    assert [p.device for p in ports] == ["/dev/ttyS0"]

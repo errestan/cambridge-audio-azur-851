@@ -7,19 +7,17 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
-from .azur851 import Azur851Client, Azur851ConnectionError
+from .azur851 import Azur851Client, Azur851ConnectionError, async_discover_ports
 from .const import CONF_MODEL, CONF_SERIAL_URL, DOMAIN, SUPPORTED_MODELS
 
 _LOGGER = logging.getLogger(__name__)
-
-STEP_USER_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_MODEL): vol.In(SUPPORTED_MODELS),
-        # serialx URL: /dev/ttyUSB0, socket://host:port, or an esphome:// proxy.
-        vol.Required(CONF_SERIAL_URL): str,
-    }
-)
 
 
 class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -30,11 +28,12 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
+        """Pick a discovered port (or type a URL) and the model."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_SERIAL_URL])
+            url = user_input[CONF_SERIAL_URL]
+            await self.async_set_unique_id(url)
             self._abort_if_unique_id_configured()
 
             try:
@@ -46,9 +45,41 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error validating Azur 851 connection")
                 errors["base"] = "unknown"
             else:
-                title = f"Azur {user_input[CONF_MODEL]}"
-                return self.async_create_entry(title=title, data=user_input)
+                return self.async_create_entry(
+                    title=f"Azur {user_input[CONF_MODEL]}", data=user_input
+                )
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=await self._async_user_schema(),
+            errors=errors,
+        )
+
+    async def _async_user_schema(self) -> vol.Schema:
+        """Build the form schema, populating the port picker from discovery."""
+        ports = await async_discover_ports()
+        port_options = [
+            SelectOptionDict(value=port.device, label=port.label) for port in ports
+        ]
+        return vol.Schema(
+            {
+                vol.Required(CONF_MODEL): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=model, label=model)
+                            for model in SUPPORTED_MODELS
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                # custom_value=True lets the user pick a discovered port OR type a
+                # URL (socket://host:port, esphome://host:6053/?port_name=...).
+                vol.Required(CONF_SERIAL_URL): SelectSelector(
+                    SelectSelectorConfig(
+                        options=port_options,
+                        custom_value=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            }
         )

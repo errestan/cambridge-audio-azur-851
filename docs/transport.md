@@ -105,8 +105,18 @@ Once open, if the read loop ends unexpectedly (EOF or I/O error) the connection:
 A deliberate `async_close()` sets a closing flag and cancels both the read and
 reconnect tasks, so unloading never triggers a reconnect.
 
+## Port discovery (config flow)
+
+`azur851.async_discover_ports()` enumerates `serialx.Platform.DEVICE` (local
+hardware) and `serialx.Platform.ESPHOME` (proxies, when Home Assistant has
+registered the handler), dedups by `device`, and builds a friendly label from
+`manufacturer`/`product`/`description`. A platform with no registered handler is
+skipped, never fatal. The config flow renders this as a `SelectSelector` with
+`custom_value=True`, so the user can **pick a detected port or type a URL**
+(`socket://...`, `esphome://...`) in the same field.
+
 ## Remaining work
 
-- **Config-flow selector:** use `async_list_serial_ports()` to offer a dropdown of
-  discovered local/proxied ports instead of a free-text URL.
-- **Auth params:** confirm and document the ESPHome proxy auth URL parameters.
+- **Auth params:** confirm and document the ESPHome proxy auth URL parameters
+  (encryption key / password) carried in the `esphome://` URL.
+- **Reauth/options:** allow changing the URL later without removing the entry.

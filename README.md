@@ -107,7 +107,7 @@ See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps
 - [x] Protocol round-trip tests
 - [x] Implement `connection.py` transport over `serialx` (open + read loop) — see [`docs/transport.md`](docs/transport.md)
 - [x] Push model: unsolicited group-4 updates via a read loop + `local_push` coordinator
-- [ ] Reconnection / backoff when the serial link drops
+- [x] Reconnection / backoff when the serial link drops (entities go unavailable then recover)
 - [ ] Config-flow port selector via `serialx.async_list_serial_ports()`
 - [ ] Confirm ESPHome serial-proxy auth URL parameters
 - [ ] Validate against real hardware

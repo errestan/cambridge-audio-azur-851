@@ -39,11 +39,14 @@ class Azur851Client:
         """Initialize the client and subscribe to inbound frames."""
         self._connection = connection
         self._connection.on_frame = self._handle_frame
+        self._connection.on_connection_state = self._forward_connection_state
         self._model = model
         self._capabilities = get_model_capabilities(model)
         self._state = DeviceState()
         # Set by the coordinator to receive push notifications on state change.
         self.on_update: Callable[[], None] | None = None
+        # Set by the coordinator to track availability (True = up, False = down).
+        self.on_connection_state: Callable[[bool], None] | None = None
 
     @classmethod
     def from_config(cls, data: dict[str, Any]) -> Self:
@@ -130,6 +133,11 @@ class Azur851Client:
     async def _write(self, command: Command) -> None:
         """Encode and send a command. The device answers via the read loop."""
         await self._connection.async_write(encode(command))
+
+    def _forward_connection_state(self, connected: bool) -> None:
+        """Relay the transport's up/down state to the coordinator."""
+        if self.on_connection_state is not None:
+            self.on_connection_state(connected)
 
     def _handle_frame(self, raw: bytes) -> None:
         """Handle one inbound frame from the connection's read loop."""

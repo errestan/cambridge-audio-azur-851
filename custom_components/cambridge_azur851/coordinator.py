@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .azur851 import Azur851Client, Azur851Error
+from .azur851 import Azur851Client, Azur851ConnectionError, Azur851Error
 from .azur851.models import DeviceState
 from .const import DOMAIN
 
@@ -39,11 +39,22 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
         )
         self.client = Azur851Client.from_config(entry.data)
         self.client.on_update = self._handle_push
+        self.client.on_connection_state = self._handle_connection_state
 
     @callback
     def _handle_push(self) -> None:
         """Publish freshly pushed device state to listeners."""
         self.async_set_updated_data(self.client.state)
+
+    @callback
+    def _handle_connection_state(self, connected: bool) -> None:
+        """Mark entities available/unavailable as the link comes and goes."""
+        if connected:
+            self.async_set_updated_data(self.client.state)
+        else:
+            self.async_set_update_error(
+                Azur851ConnectionError("Connection to Azur 851 lost")
+            )
 
     async def _async_update_data(self) -> DeviceState:
         """Ensure the connection is open; return the latest known state.

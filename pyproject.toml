@@ -6,6 +6,10 @@ src = ["custom_components", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "PL"]
 
+[tool.ruff.lint.per-file-ignores]
+# Literal comparisons are normal and readable in test assertions.
+"tests/**" = ["PLR2004"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

@@ -90,9 +90,23 @@ serial_proxy:
   coordinator turns that into `async_set_updated_data` (hence `iot_class:
   local_push`, no polling interval).
 
+## Reconnection
+
+The initial `async_open()` raises on failure so setup can report `cannot_connect`.
+Once open, if the read loop ends unexpectedly (EOF or I/O error) the connection:
+
+1. clears the reader/writer and fires `on_connection_state(False)` — the
+   coordinator calls `async_set_update_error`, so entities go **unavailable**;
+2. starts a background reconnect task that retries with **exponential backoff**
+   (2s, doubling, capped at 60s) until it succeeds or the entry is unloaded;
+3. on success, restarts the read loop and fires `on_connection_state(True)`, so
+   entities become available again.
+
+A deliberate `async_close()` sets a closing flag and cancels both the read and
+reconnect tasks, so unloading never triggers a reconnect.
+
 ## Remaining work
 
-- **Reconnection:** the read loop exits on EOF/error; add reconnect/backoff.
 - **Config-flow selector:** use `async_list_serial_ports()` to offer a dropdown of
   discovered local/proxied ports instead of a free-text URL.
 - **Auth params:** confirm and document the ESPHome proxy auth URL parameters.

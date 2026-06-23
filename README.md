@@ -97,6 +97,15 @@ pip install -r requirements_dev.txt
 pytest
 ```
 
+### Continuous integration
+
+Two GitHub Actions workflows run on push and PR:
+
+- **CI** (`.github/workflows/ci.yml`) — runs the pre-commit hooks (ruff, ruff-format,
+  mypy, file hygiene) and the `pytest` suite.
+- **Validate** (`.github/workflows/validate.yml`) — runs Home Assistant **hassfest**
+  and the **HACS** validation action.
+
 See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps.
 
 ## Roadmap
@@ -113,7 +122,7 @@ See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps
 - [ ] Reauth/options flow to change the URL or key later
 - [ ] Validate against real hardware
 - [ ] Tests: config flow, coordinator
-- [ ] HACS validation & GitHub Actions (hassfest, HACS action)
+- [x] CI: GitHub Actions (pre-commit lint/type, pytest, hassfest, HACS validation)
 
 ## License
 

@@ -116,12 +116,15 @@ pytest
 
 ### Continuous integration
 
-Two GitHub Actions workflows run on push and PR:
+GitHub Actions workflows:
 
 - **CI** (`.github/workflows/ci.yml`) — runs the pre-commit hooks (ruff, ruff-format,
-  mypy, file hygiene) and the `pytest` suite.
+  mypy, file hygiene) and the `pytest` suite on push and PR.
 - **Validate** (`.github/workflows/validate.yml`) — runs Home Assistant **hassfest**
   and the **HACS** validation action.
+- **Release Please** (`.github/workflows/release-please.yml`) — automates versioning
+  and GitHub Releases from Conventional Commits (see
+  [`CONTRIBUTING.md`](CONTRIBUTING.md#releases)).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next implementation steps.
 

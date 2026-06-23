@@ -46,6 +46,24 @@ action run in `.github/workflows/validate.yml`.
 
 ## Commit / PR
 
-- Use focused commits with clear messages.
+- Use focused commits, and write messages as
+  [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`,
+  `docs:`, `refactor:`, `test:`, `chore:` (a `feat!:` / `BREAKING CHANGE:` footer
+  bumps the major version). This drives automated releases (see below).
 - Ensure `pre-commit run --all-files` and `pytest` pass before opening a PR.
 - Update `docs/` and the README roadmap when behaviour changes.
+
+## Releases
+
+Releases are automated with
+[release-please](https://github.com/googleapis/release-please-action)
+(`.github/workflows/release-please.yml`):
+
+1. Merging Conventional-Commit changes to `main` opens/updates a **release PR**
+   that bumps the version, updates `CHANGELOG.md`, and syncs the `version` in
+   `manifest.json` (via `release-please-config.json`).
+2. Merging that release PR tags the commit and publishes a **GitHub Release** —
+   which is what HACS and the "Latest release" badge read.
+
+No manual version editing is needed; release-please owns `manifest.json`'s
+`version` and `.release-please-manifest.json`.

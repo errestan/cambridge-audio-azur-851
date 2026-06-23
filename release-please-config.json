@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "cambridge-audio-azur-851",
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "custom_components/cambridge_azur851/manifest.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

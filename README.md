@@ -1,10 +1,20 @@
 # Cambridge Audio Azur 851 — Home Assistant Integration
 
+<!-- Replace `your-org` (and @your-handle in manifest.json) with your GitHub
+     repo once published; the badges resolve after the first push & release. -->
+[![CI](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/ci.yml)
+[![Validate](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/validate.yml/badge.svg)](https://github.com/your-org/cambridge-audio-azur-851/actions/workflows/validate.yml)
+[![Latest release](https://img.shields.io/github/v/release/your-org/cambridge-audio-azur-851?sort=semver)](https://github.com/your-org/cambridge-audio-azur-851/releases)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![License: MIT](https://img.shields.io/github/license/your-org/cambridge-audio-azur-851)](LICENSE)
+
 A custom [Home Assistant](https://www.home-assistant.io/) integration for controlling
 **Cambridge Audio Azur 851 series** audio equipment over RS-232 serial.
 
-> **Status:** project outline / template. The serial protocol layer and entity
-> behaviour are stubbed and marked with `TODO`. See [Roadmap](#roadmap).
+> **Status:** early but functional. The RS-232 protocol, the `serialx` transport
+> (local / `socket://` / ESPHome proxy) with auto-reconnect, the `media_player`
+> entity, and the config/reconfigure flows are implemented and unit-tested. Not
+> yet validated against real hardware. See [Roadmap](#roadmap).
 
 ## Supported hardware (target)
 
@@ -106,7 +116,7 @@ Two GitHub Actions workflows run on push and PR:
 - **Validate** (`.github/workflows/validate.yml`) — runs Home Assistant **hassfest**
   and the **HACS** validation action.
 
-See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next implementation steps.
 
 ## Roadmap
 

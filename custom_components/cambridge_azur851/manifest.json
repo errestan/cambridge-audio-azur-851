@@ -1,0 +1,13 @@
+{
+  "domain": "cambridge_azur851",
+  "name": "Cambridge Audio Azur 851",
+  "version": "0.1.0",
+  "documentation": "https://github.com/your-org/cambridge-audio-azur-851",
+  "issue_tracker": "https://github.com/your-org/cambridge-audio-azur-851/issues",
+  "codeowners": ["@your-handle"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "integration_type": "device",
+  "dependencies": [],
+  "requirements": []
+}

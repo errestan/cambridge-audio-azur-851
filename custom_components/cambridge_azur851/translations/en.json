@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cambridge Audio Azur 851",
+        "description": "Connect to your Azur 851 device through a serial proxy / network serial bridge.",
+        "data": {
+          "model": "Model",
+          "host": "Serial proxy host",
+          "port": "Serial proxy port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the device.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}

@@ -4,13 +4,15 @@ This package has NO Home Assistant imports. It can be imported, tested, and used
 independently of Home Assistant. The integration layer wraps it via the
 DataUpdateCoordinator.
 
-State note: the 851A protocol has no "read everything" query -- the device emits
-group-4 update frames when state changes. The client maintains a best-effort
-``DeviceState`` from those frames via :meth:`Azur851Client.apply_update`.
+State model: the 851 protocol has no "read everything" query -- the device emits
+group-4 update frames when state changes. The connection's read loop feeds those
+frames to :meth:`Azur851Client._handle_frame`, which updates ``state`` and fires
+the optional ``on_update`` callback so the coordinator can push to Home Assistant.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Self
 
 from . import commands
@@ -34,23 +36,21 @@ class Azur851Client:
     """
 
     def __init__(self, connection: Azur851Connection, model: str) -> None:
-        """Initialize the client."""
+        """Initialize the client and subscribe to inbound frames."""
         self._connection = connection
+        self._connection.on_frame = self._handle_frame
         self._model = model
         self._capabilities = get_model_capabilities(model)
         self._state = DeviceState()
+        # Set by the coordinator to receive push notifications on state change.
+        self.on_update: Callable[[], None] | None = None
 
     @classmethod
     def from_config(cls, data: dict[str, Any]) -> Self:
         """Build a client from a config entry's data dict."""
         model = data["model"]
         capabilities = get_model_capabilities(model)
-        if serial_url := data.get("serial_url"):
-            connection = Azur851Connection.from_serial_url(
-                serial_url, capabilities.baudrate
-            )
-        else:
-            connection = Azur851Connection.from_serial_proxy(data["host"], data["port"])
+        connection = Azur851Connection(data["serial_url"], capabilities.baudrate)
         return cls(connection, model)
 
     @property
@@ -58,24 +58,29 @@ class Azur851Client:
         """Return the capability map for this model."""
         return self._capabilities
 
+    @property
+    def state(self) -> DeviceState:
+        """Return the latest known device state."""
+        return self._state
+
+    @property
+    def is_open(self) -> bool:
+        """Return True if the transport is open."""
+        return self._connection.is_open
+
     # --- Connection lifecycle ---------------------------------------------
 
-    async def async_test_connection(self) -> None:
-        """Open the connection and confirm the device responds.
-
-        Used by the config flow. Queries the protocol version and expects a
-        group-3 reply.
-        """
+    async def async_connect(self) -> None:
+        """Open the transport and start receiving updates."""
         await self._connection.async_open()
-        await self._send(commands.get_protocol_version())
 
-    async def async_poll_state(self) -> DeviceState:
-        """Return the latest known device state.
-
-        The 851 protocol is push-based, so this returns the state accumulated
-        from group-4 update frames rather than issuing a bulk query.
-        """
-        return self._state
+    async def async_test_connection(self) -> None:
+        """Open the link, probe the device, then close. Used by the config flow."""
+        await self._connection.async_open()
+        try:
+            await self._connection.async_write(encode(commands.get_protocol_version()))
+        finally:
+            await self._connection.async_close()
 
     async def async_close(self) -> None:
         """Close the underlying transport."""
@@ -85,22 +90,22 @@ class Azur851Client:
 
     async def async_power(self, on: bool) -> None:
         """Set power / standby."""
-        await self._send(commands.power(on))
+        await self._write(commands.power(on))
 
     async def async_mute(self, mute: bool) -> None:
         """Mute or unmute."""
-        await self._send(commands.mute(mute))
+        await self._write(commands.mute(mute))
 
     async def async_set_volume(self, level: float) -> None:
         """Set volume from a 0..1 fraction, scaled to the device range."""
-        await self._send(commands.set_volume(self._scale_to_device(level)))
+        await self._write(commands.set_volume(self._scale_to_device(level)))
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source by its configured name."""
         index = self._capabilities.sources.get(source)
         if index is None:
             raise Azur851Error(f"Unknown source for {self._model}: {source!r}")
-        await self._send(commands.select_input(index))
+        await self._write(commands.select_input(index))
 
     # --- Volume scaling helpers -------------------------------------------
 
@@ -122,21 +127,25 @@ class Azur851Client:
 
     # --- Frame handling ----------------------------------------------------
 
-    async def _send(self, command: Command) -> Response | None:
-        """Send a command, parse the reply, and fold any update into state."""
-        raw = await self._connection.async_send(encode(command))
-        if not raw:
-            return None
-        response = decode(raw)
-        if response.is_error:
-            raise Azur851CommandError(response.number)
-        self.apply_update(response)
-        return response
+    async def _write(self, command: Command) -> None:
+        """Encode and send a command. The device answers via the read loop."""
+        await self._connection.async_write(encode(command))
 
-    def apply_update(self, response: Response) -> None:
-        """Update cached state from a group-4 update/reply frame."""
+    def _handle_frame(self, raw: bytes) -> None:
+        """Handle one inbound frame from the connection's read loop."""
+        try:
+            response = decode(raw)
+        except Azur851ProtocolError:
+            return  # ignore unparseable noise on the line
+        if response.is_error:
+            return  # group-5 errors are not state; could be logged/raised later
+        if self.apply_update(response) and self.on_update is not None:
+            self.on_update()
+
+    def apply_update(self, response: Response) -> bool:
+        """Fold a group-4 update/reply frame into state; return True if changed."""
         if response.group != Group.UPDATE:
-            return
+            return False
         number = response.number
         if number == Control.POWER:
             self._state.power_on = response.data == "1"
@@ -147,6 +156,9 @@ class Azur851Client:
             self._state.volume_raw = _to_int(response.data)
         elif INPUT_MIN <= number <= INPUT_MAX:
             self._state.source_code = number
+        else:
+            return False
+        return True
 
 
 def _to_int(data: str) -> int | None:

@@ -9,24 +9,15 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 
 from .azur851 import Azur851Client, Azur851ConnectionError
-from .const import (
-    CONF_HOST,
-    CONF_MODEL,
-    CONF_PORT,
-    DEFAULT_PORT,
-    DOMAIN,
-    SUPPORTED_MODELS,
-)
+from .const import CONF_MODEL, CONF_SERIAL_URL, DOMAIN, SUPPORTED_MODELS
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_MODEL): vol.In(SUPPORTED_MODELS),
-        # Serial-proxy / network bridge address.
-        # TODO: align fields with the chosen serial-proxy connection scheme.
-        vol.Required(CONF_HOST): str,
-        vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
+        # serialx URL: /dev/ttyUSB0, socket://host:port, or an esphome:// proxy.
+        vol.Required(CONF_SERIAL_URL): str,
     }
 )
 
@@ -43,16 +34,12 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            await self.async_set_unique_id(
-                f"{user_input[CONF_HOST]}:{user_input[CONF_PORT]}"
-            )
+            await self.async_set_unique_id(user_input[CONF_SERIAL_URL])
             self._abort_if_unique_id_configured()
 
             try:
-                # Validate by opening a connection and reading identity/state.
                 client = Azur851Client.from_config(user_input)
                 await client.async_test_connection()
-                await client.async_close()
             except Azur851ConnectionError:
                 errors["base"] = "cannot_connect"
             except Exception:  # noqa: BLE001

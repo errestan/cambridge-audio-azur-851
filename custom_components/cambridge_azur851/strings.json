@@ -3,11 +3,10 @@
     "step": {
       "user": {
         "title": "Cambridge Audio Azur 851",
-        "description": "Connect to your Azur 851 device through a serial proxy / network serial bridge.",
+        "description": "Enter the model and the serial connection URL. Examples: a local port `/dev/ttyUSB0`, a network bridge `socket://192.168.1.50:4001`, or an ESPHome serial proxy `esphome://192.168.1.42:6053/?port_name=851A`.",
         "data": {
           "model": "Model",
-          "host": "Serial proxy host",
-          "port": "Serial proxy port"
+          "serial_url": "Serial URL"
         }
       }
     },

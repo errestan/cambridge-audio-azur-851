@@ -7,4 +7,4 @@ pytest-asyncio>=0.23
 pytest-cov>=5.0
 ruff>=0.6
 mypy>=1.10
-pyserial-asyncio-fast>=0.13   # candidate transport dependency (see manifest.json)
+serialx>=1.8.2   # serial transport (local / socket:// / esphome:// proxy)

@@ -1,74 +1,100 @@
 """Transport layer for the Azur 851 client.
 
-Abstracts *how* bytes reach the device so the protocol layer doesn't care whether
-the link is a Home Assistant serial proxy, a raw TCP socket to a serial bridge, or
-a local serial port.
+Uses Home Assistant's ``serialx`` library, whose ``open_serial_connection`` URL
+handles local ports, ``socket://`` bridges (ser2net/socat) and ESPHome serial
+proxies transparently -- so this module does not care which is in use.
 
-Construction stores connection parameters only; opening the link and the actual
-byte I/O are left as TODOs (see ``async_open`` / ``async_send``).
+Because the 851 protocol is push-based (the device emits group-4 frames on every
+state change), the connection runs a background read loop and pushes each
+complete frame to ``on_frame``; writes are fire-and-forget.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import Callable
+
+import serialx
+
+from .exceptions import Azur851ConnectionError
+from .protocol import TERMINATOR
+
+_LOGGER = logging.getLogger(__name__)
+
+# Frames are terminated by a carriage return (0x0D).
+_TERMINATOR_BYTES: bytes = TERMINATOR.encode("ascii")
 
 
 class Azur851Connection:
-    """Async byte transport with a single-writer lock.
+    """Async serial transport with a background read loop.
 
-    Only one command/response exchange may be in flight at a time, so all I/O is
-    serialized behind ``_lock``.
+    ``on_frame`` is invoked (in the event loop) with each complete raw frame,
+    including the trailing terminator. Writes are serialized behind ``_lock``.
     """
 
-    def __init__(self) -> None:
-        """Initialize the connection wrapper."""
+    def __init__(self, url: str, baudrate: int) -> None:
+        """Store connection parameters. The link is opened by ``async_open``."""
+        self._url = url
+        self._baudrate = baudrate
         self._lock = asyncio.Lock()
         self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
-        self._host: str | None = None
-        self._port: int | None = None
-        self._serial_url: str | None = None
-        self._baudrate: int | None = None
+        self._writer: serialx.SerialStreamWriter | None = None
+        self._read_task: asyncio.Task[None] | None = None
+        self.on_frame: Callable[[bytes], None] | None = None
 
-    @classmethod
-    def from_serial_proxy(cls, host: str, port: int) -> Azur851Connection:
-        """Create a connection that reaches the device via a serial proxy.
-
-        TODO: Confirm the serial-proxy connection scheme for the target HA
-        release, then implement ``async_open``/``async_send`` accordingly.
-        Likely either a TCP socket (``asyncio.open_connection``) or a
-        ``socket://host:port`` serial URL.
-        """
-        conn = cls()
-        conn._host = host
-        conn._port = port
-        return conn
-
-    @classmethod
-    def from_serial_url(cls, url: str, baudrate: int) -> Azur851Connection:
-        """Create a connection from a pyserial URL (local port or socket://...)."""
-        conn = cls()
-        conn._serial_url = url
-        conn._baudrate = baudrate
-        return conn
+    @property
+    def is_open(self) -> bool:
+        """Return True if the transport is currently open."""
+        return self._writer is not None
 
     async def async_open(self) -> None:
-        """Open the transport."""
-        # TODO: establish self._reader / self._writer from the stored params.
-        raise NotImplementedError
+        """Open the serial link and start the background read loop."""
+        if self.is_open:
+            return
+        try:
+            self._reader, self._writer = await serialx.open_serial_connection(
+                self._url, baudrate=self._baudrate
+            )
+        except (serialx.SerialException, OSError, ValueError) as err:
+            raise Azur851ConnectionError(f"Could not open {self._url}: {err}") from err
+        self._read_task = asyncio.create_task(self._read_loop())
 
-    async def async_send(self, frame: bytes) -> bytes:
-        """Send a command frame and return the raw response frame.
+    async def _read_loop(self) -> None:
+        """Read complete frames and dispatch them to ``on_frame``."""
+        assert self._reader is not None
+        while True:
+            try:
+                frame = await self._reader.readuntil(_TERMINATOR_BYTES)
+            except asyncio.IncompleteReadError:
+                break  # EOF: link closed
+            except (serialx.SerialException, OSError, asyncio.LimitOverrunError) as err:
+                _LOGGER.debug("Serial read loop stopped: %s", err)
+                break
+            if self.on_frame is not None:
+                self.on_frame(frame)
 
-        Guarded by the lock so concurrent callers do not interleave I/O.
-        """
+    async def async_write(self, frame: bytes) -> None:
+        """Write a command frame to the device."""
+        if self._writer is None:
+            raise Azur851ConnectionError("Connection is not open")
         async with self._lock:
-            # TODO: write `frame`, then read until the CR terminator (0x0D).
-            raise NotImplementedError
+            try:
+                self._writer.write(frame)
+                await self._writer.drain()
+            except (serialx.SerialException, OSError) as err:
+                raise Azur851ConnectionError(f"Write failed: {err}") from err
 
     async def async_close(self) -> None:
-        """Close the transport."""
+        """Stop the read loop and close the transport."""
+        if self._read_task is not None:
+            self._read_task.cancel()
+            self._read_task = None
         if self._writer is not None:
             self._writer.close()
+            try:
+                await self._writer.wait_closed()
+            except (serialx.SerialException, OSError):
+                pass
             self._writer = None
             self._reader = None

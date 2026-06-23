@@ -38,10 +38,14 @@ ESPHome device, ser2net, or a USB-serial server).
 +----------------+                        +------------------+              +-----------+
 ```
 
-> **TODO / verify:** Confirm the exact serial-proxy API surface and connection
-> parameters against the targeted Home Assistant release before implementing
-> `azur851/connection.py`. The connection layer is intentionally abstracted so a
-> direct local serial port can also be supported.
+The transport uses Home Assistant's [`serialx`](https://github.com/puddly/serialx)
+library (HA 2026.5+), so a single **Serial URL** selects the backend
+transparently — a local port (`/dev/ttyUSB0`), a network bridge
+(`socket://host:port`), or an ESPHome serial proxy
+(`esphome://host:6053/?port_name=851A`). Because the device pushes state changes
+unsolicited, the connection runs a background read loop and the integration is
+`local_push`. See [`docs/transport.md`](docs/transport.md) and
+[`docs/protocol.md`](docs/protocol.md).
 
 ## Architecture
 
@@ -101,10 +105,12 @@ See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps
 - [x] Per-model capability maps in `models.py` (851A/851E baud + volume verified)
 - [x] Flesh out `media_player.py` (power, volume, mute, source, state mapping)
 - [x] Protocol round-trip tests
-- [ ] Confirm serial-proxy connection API for the target HA version
-- [ ] Implement `connection.py` transport (open + read loop, reconnect handling)
-- [ ] Switch to a push model: parse unsolicited group-4 updates (consider `local_push`)
-- [ ] Config flow validation against real hardware
+- [x] Implement `connection.py` transport over `serialx` (open + read loop) — see [`docs/transport.md`](docs/transport.md)
+- [x] Push model: unsolicited group-4 updates via a read loop + `local_push` coordinator
+- [ ] Reconnection / backoff when the serial link drops
+- [ ] Config-flow port selector via `serialx.async_list_serial_ports()`
+- [ ] Confirm ESPHome serial-proxy auth URL parameters
+- [ ] Validate against real hardware
 - [ ] Tests: config flow, coordinator
 - [ ] HACS validation & GitHub Actions (hassfest, HACS action)
 

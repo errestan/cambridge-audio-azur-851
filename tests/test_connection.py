@@ -6,6 +6,7 @@ These drive a fake serialx link and do not require real hardware.
 from __future__ import annotations
 
 import asyncio
+import urllib.parse
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,7 @@ import serialx
 from custom_components.cambridge_azur851.azur851.connection import (
     Azur851Connection,
     async_discover_ports,
+    build_serial_url,
 )
 
 
@@ -165,3 +167,34 @@ async def test_discover_ports_swallows_platform_errors(
     ports = await async_discover_ports()
 
     assert [p.device for p in ports] == ["/dev/ttyS0"]
+
+
+def _query(url: str) -> dict[str, str]:
+    return dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+
+
+def test_build_serial_url_adds_key_to_esphome() -> None:
+    """An ESPHome URL gains the key as a query parameter, keeping port_name."""
+    url = build_serial_url("esphome://1.2.3.4:6053/?port_name=851A", "SECRET_PSK")
+    query = _query(url)
+    assert query == {"port_name": "851A", "key": "SECRET_PSK"}
+    assert url.startswith("esphome://1.2.3.4:6053/")
+
+
+def test_build_serial_url_no_key_is_unchanged() -> None:
+    """A blank/absent key leaves the URL alone."""
+    url = "esphome://1.2.3.4:6053/?port_name=851A"
+    assert build_serial_url(url, None) == url
+    assert build_serial_url(url, "") == url
+
+
+def test_build_serial_url_ignores_non_esphome() -> None:
+    """The key only applies to esphome:// URLs."""
+    for url in ("/dev/ttyUSB0", "socket://192.168.1.50:4001"):
+        assert build_serial_url(url, "SECRET_PSK") == url
+
+
+def test_build_serial_url_preserves_existing_key() -> None:
+    """An explicit key already in the URL is not overwritten."""
+    url = "esphome://1.2.3.4/?port_name=851A&key=INLINE"
+    assert _query(build_serial_url(url, "OTHER"))["key"] == "INLINE"

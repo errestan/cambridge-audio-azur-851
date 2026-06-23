@@ -12,10 +12,24 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 
-from .azur851 import Azur851Client, Azur851ConnectionError, async_discover_ports
-from .const import CONF_MODEL, CONF_SERIAL_URL, DOMAIN, SUPPORTED_MODELS
+from .azur851 import (
+    Azur851Client,
+    Azur851ConnectionError,
+    async_discover_ports,
+    build_serial_url,
+)
+from .const import (
+    CONF_KEY,
+    CONF_MODEL,
+    CONF_SERIAL_URL,
+    DOMAIN,
+    SUPPORTED_MODELS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,12 +46,20 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            url = user_input[CONF_SERIAL_URL]
-            await self.async_set_unique_id(url)
+            await self.async_set_unique_id(user_input[CONF_SERIAL_URL])
             self._abort_if_unique_id_configured()
 
+            # Fold any ESPHome encryption key into the URL; store the result so
+            # the key is not kept as a separate config value.
+            data = {
+                CONF_MODEL: user_input[CONF_MODEL],
+                CONF_SERIAL_URL: build_serial_url(
+                    user_input[CONF_SERIAL_URL], user_input.get(CONF_KEY)
+                ),
+            }
+
             try:
-                client = Azur851Client.from_config(user_input)
+                client = Azur851Client.from_config(data)
                 await client.async_test_connection()
             except Azur851ConnectionError:
                 errors["base"] = "cannot_connect"
@@ -46,7 +68,7 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 return self.async_create_entry(
-                    title=f"Azur {user_input[CONF_MODEL]}", data=user_input
+                    title=f"Azur {user_input[CONF_MODEL]}", data=data
                 )
 
         return self.async_show_form(
@@ -80,6 +102,10 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
                         custom_value=True,
                         mode=SelectSelectorMode.DROPDOWN,
                     )
+                ),
+                # Only needed for an encrypted ESPHome serial proxy.
+                vol.Optional(CONF_KEY): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
                 ),
             }
         )

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -45,6 +46,25 @@ class DiscoveredPort:
 
     device: str  # the URL/path to pass to serialx
     label: str
+
+
+def build_serial_url(url: str, key: str | None) -> str:
+    """Fold an ESPHome API encryption key into an ``esphome://`` URL.
+
+    serialx authenticates to an ESPHome serial proxy with the Noise PSK passed as
+    the ``key=`` query parameter. Discovery only emits ``port_name``, so this adds
+    the key the user supplied separately. Non-esphome URLs and blank keys are
+    returned unchanged; a key already present in the URL is preserved.
+    """
+    if not key:
+        return url
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "esphome":
+        return url
+    query = dict(urllib.parse.parse_qsl(parsed.query))
+    if "key" not in query and "noise_psk" not in query:
+        query["key"] = key
+    return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(query)))
 
 
 def _describe(port: serialx.SerialPortInfo) -> str:

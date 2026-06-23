@@ -50,15 +50,28 @@ await writer.wait_closed()
 |------------|-------------|
 | Local serial port | `/dev/ttyUSB0`, `/dev/serial/by-id/...` |
 | Network bridge (ser2net/socat) | `socket://192.168.1.50:4001` |
-| ESPHome serial proxy | `esphome://<host>:6053/?port_name=<name>` |
+| ESPHome serial proxy | `esphome://<host>[:6053]/?port_name=<name>[&key=<noise_psk>]` |
 
-For the ESPHome proxy, `6053` is the Native API port and `port_name` matches the
-`name:` of the `serial_proxy:` block in the ESPHome YAML. Authentication
-(API encryption key / password) is carried as additional URL parameters.
+ESPHome proxy URL parameters, verified from the serialx source
+(`serialx/platforms/serial_esphome.py`, v1.8.2):
 
-> ⚠️ The exact ESPHome-proxy query-parameter names (auth key etc.) should be
-> confirmed against the serialx docs for the version bundled with the target HA
-> release before relying on them in production.
+| Part | Meaning |
+|------|---------|
+| `<host>` | ESPHome device hostname/IP (required) |
+| port | Native API port; defaults to **6053** if omitted |
+| `port_name` | the `name:` of the `serial_proxy:` block in the ESPHome YAML |
+| `key` | **API encryption key (Noise PSK)** — the auth parameter; `noise_psk` is an accepted alias |
+| `password` | legacy API password (deprecated in ESPHome; prefer `key`) |
+
+So an encrypted proxy is addressed as:
+
+```
+esphome://192.168.1.42:6053/?port_name=851A&key=<base64-noise-psk>
+```
+
+The config flow has a separate optional **ESPHome encryption key** field; when
+set, `build_serial_url()` folds it into an `esphome://` URL as `key=` (it leaves
+non-esphome URLs and URLs that already contain a key untouched).
 
 ### ESPHome side (proxy device YAML)
 
@@ -70,6 +83,8 @@ uart:
     baud_rate: 9600   # match the model: 851A=9600, 851E=115200
 
 api:
+  encryption:
+    key: !secret api_encryption_key   # this value goes in the `key=` URL param
 
 serial_proxy:
   - id: device_serial
@@ -117,6 +132,5 @@ skipped, never fatal. The config flow renders this as a `SelectSelector` with
 
 ## Remaining work
 
-- **Auth params:** confirm and document the ESPHome proxy auth URL parameters
-  (encryption key / password) carried in the `esphome://` URL.
-- **Reauth/options:** allow changing the URL later without removing the entry.
+- **Reauth/options:** allow changing the URL or encryption key later without
+  removing the entry.

@@ -10,8 +10,8 @@ MANUFACTURER: Final = "Cambridge Audio"
 
 # --- Config entry keys -----------------------------------------------------
 CONF_MODEL: Final = "model"
-CONF_HOST: Final = "host"          # serial-proxy / network bridge host
-CONF_PORT: Final = "port"          # serial-proxy / network bridge TCP port
+CONF_HOST: Final = "host"  # serial-proxy / network bridge host
+CONF_PORT: Final = "port"  # serial-proxy / network bridge TCP port
 CONF_SERIAL_URL: Final = "serial_url"  # alternative: explicit serial/socket URL
 
 # --- Defaults --------------------------------------------------------------

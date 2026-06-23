@@ -24,7 +24,7 @@ class Azur851Connection:
         self._writer: asyncio.StreamWriter | None = None
 
     @classmethod
-    def from_serial_proxy(cls, host: str, port: int) -> "Azur851Connection":
+    def from_serial_proxy(cls, host: str, port: int) -> Azur851Connection:
         """Create a connection that uses Home Assistant's serial proxy.
 
         TODO: Confirm the serial-proxy connection API for the target HA release.
@@ -36,7 +36,7 @@ class Azur851Connection:
         raise NotImplementedError
 
     @classmethod
-    def from_serial_url(cls, url: str, baudrate: int) -> "Azur851Connection":
+    def from_serial_url(cls, url: str, baudrate: int) -> Azur851Connection:
         """Create a connection from a pyserial URL (local port or socket://...)."""
         raise NotImplementedError
 

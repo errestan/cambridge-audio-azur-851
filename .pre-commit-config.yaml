@@ -1,0 +1,35 @@
+# Pre-commit hooks for code quality.
+# Install once with:  pre-commit install
+# Run on everything:  pre-commit run --all-files
+default_language_version:
+  python: python3
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.18
+    hooks:
+      # Lint (with autofix) then format, using config from pyproject.toml.
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      # Type-check only the standalone protocol library, which has no
+      # Home Assistant imports and so needs no heavy extra dependencies.
+      - id: mypy
+        files: ^custom_components/cambridge_azur851/azur851/

@@ -119,10 +119,10 @@ See [`CONTRIBUTING`](#) and the inline `TODO`s for the next implementation steps
 - [x] Reconnection / backoff when the serial link drops (entities go unavailable then recover)
 - [x] Config-flow port selector (discovered local/proxy ports + free-text URL)
 - [x] ESPHome serial-proxy auth: optional encryption key folded into the URL (`key=`)
-- [ ] Reauth/options flow to change the URL or key later
-- [ ] Validate against real hardware
-- [ ] Tests: config flow, coordinator
+- [x] Reconfigure flow to change the URL / encryption key / model later
+- [x] Tests: config flow, reconfigure, setup/coordinator/entity
 - [x] CI: GitHub Actions (pre-commit lint/type, pytest, hassfest, HACS validation)
+- [ ] Validate against real hardware
 
 ## License
 

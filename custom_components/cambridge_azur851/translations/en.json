@@ -12,6 +12,18 @@
         "data_description": {
           "encryption_key": "Only for an encrypted ESPHome serial proxy: the API encryption key (Noise PSK) from the proxy device's `api: encryption: key:`. Leave blank for local ports or socket:// bridges."
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Azur 851",
+        "description": "Update the model or serial connection for this device. Re-enter the ESPHome encryption key if the proxy uses one.",
+        "data": {
+          "model": "Model",
+          "serial_url": "Serial port or URL",
+          "encryption_key": "ESPHome encryption key"
+        },
+        "data_description": {
+          "encryption_key": "Only for an encrypted ESPHome serial proxy: the API encryption key (Noise PSK) from the proxy device's `api: encryption: key:`. Leave blank for local ports or socket:// bridges."
+        }
       }
     },
     "error": {
@@ -19,7 +31,8 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This device is already configured."
+      "already_configured": "This device is already configured.",
+      "reconfigure_successful": "Connection settings updated."
     }
   }
 }

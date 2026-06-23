@@ -130,7 +130,9 @@ skipped, never fatal. The config flow renders this as a `SelectSelector` with
 `custom_value=True`, so the user can **pick a detected port or type a URL**
 (`socket://...`, `esphome://...`) in the same field.
 
-## Remaining work
+## Changing the connection later
 
-- **Reauth/options:** allow changing the URL or encryption key later without
-  removing the entry.
+The integration supports Home Assistant's **reconfigure** flow (the entry's
+"Reconfigure" menu): the same form is shown pre-filled with the current model and
+URL, so the serial URL, encryption key, or model can be changed and re-validated
+without removing and re-adding the device.

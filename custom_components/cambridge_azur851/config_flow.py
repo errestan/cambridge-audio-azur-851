@@ -35,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the UI-driven setup flow."""
+    """Handle the UI-driven setup and reconfigure flows."""
 
     VERSION = 1
 
@@ -49,35 +49,67 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(user_input[CONF_SERIAL_URL])
             self._abort_if_unique_id_configured()
 
-            # Fold any ESPHome encryption key into the URL; store the result so
-            # the key is not kept as a separate config value.
-            data = {
-                CONF_MODEL: user_input[CONF_MODEL],
-                CONF_SERIAL_URL: build_serial_url(
-                    user_input[CONF_SERIAL_URL], user_input.get(CONF_KEY)
-                ),
-            }
-
-            try:
-                client = Azur851Client.from_config(data)
-                await client.async_test_connection()
-            except Azur851ConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Unexpected error validating Azur 851 connection")
-                errors["base"] = "unknown"
-            else:
+            data = self._entry_data(user_input)
+            errors = await self._async_validate(data)
+            if not errors:
                 return self.async_create_entry(
                     title=f"Azur {user_input[CONF_MODEL]}", data=data
                 )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=await self._async_user_schema(),
+            data_schema=await self._async_form_schema(),
             errors=errors,
         )
 
-    async def _async_user_schema(self) -> vol.Schema:
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the connection (URL / encryption key / model) of an entry."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            data = self._entry_data(user_input)
+            errors = await self._async_validate(data)
+            if not errors:
+                return self.async_update_reload_and_abort(entry, data=data)
+
+        suggested = {
+            CONF_MODEL: entry.data[CONF_MODEL],
+            CONF_SERIAL_URL: entry.data[CONF_SERIAL_URL],
+        }
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                await self._async_form_schema(), suggested
+            ),
+            errors=errors,
+        )
+
+    @staticmethod
+    def _entry_data(user_input: dict[str, Any]) -> dict[str, Any]:
+        """Build stored entry data, folding any encryption key into the URL."""
+        return {
+            CONF_MODEL: user_input[CONF_MODEL],
+            CONF_SERIAL_URL: build_serial_url(
+                user_input[CONF_SERIAL_URL], user_input.get(CONF_KEY)
+            ),
+        }
+
+    async def _async_validate(self, data: dict[str, Any]) -> dict[str, str]:
+        """Try connecting; return form errors (empty dict means success)."""
+        try:
+            client = Azur851Client.from_config(data)
+            await client.async_test_connection()
+        except Azur851ConnectionError:
+            return {"base": "cannot_connect"}
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Unexpected error validating Azur 851 connection")
+            return {"base": "unknown"}
+        return {}
+
+    async def _async_form_schema(self) -> vol.Schema:
         """Build the form schema, populating the port picker from discovery."""
         ports = await async_discover_ports()
         port_options = [

@@ -9,9 +9,11 @@ import asyncio
 
 import pytest
 import serialx
+from custom_components.cambridge_azur851.azur851 import Azur851Client
 from custom_components.cambridge_azur851.azur851.connection import Azur851Connection
 from custom_components.cambridge_azur851.azur851.exceptions import (
     Azur851ConnectionError,
+    Azur851NoResponseError,
 )
 
 
@@ -120,3 +122,33 @@ async def test_open_wraps_non_serial_errors(monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(Azur851ConnectionError):
         await conn.async_open()
     assert conn.is_open is False
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [b"#3,02,2.4\r", b"#5,08\r"],
+    ids=["protocol-version", "error-frame"],
+)
+async def test_test_connection_succeeds_on_reply(
+    fake_serial, monkeypatch: pytest.MonkeyPatch, reply: bytes
+) -> None:
+    """Any valid frame (even a group-5 error) proves the device is there."""
+    readers, _ = fake_serial
+    # The "device" answers whatever is written to it.
+    monkeypatch.setattr(
+        _FakeWriter, "write", lambda self, data: readers[-1].feed_data(reply)
+    )
+    client = Azur851Client(Azur851Connection("fake://x", 9600), "851A")
+
+    await client.async_test_connection()
+
+    assert client.is_open is False  # the probe link is closed afterwards
+
+
+async def test_test_connection_no_response(fake_serial) -> None:
+    """A silent device raises Azur851NoResponseError and the link is closed."""
+    client = Azur851Client(Azur851Connection("fake://x", 9600), "851A")
+
+    with pytest.raises(Azur851NoResponseError):
+        await client.async_test_connection(response_timeout=0.05)
+    assert client.is_open is False

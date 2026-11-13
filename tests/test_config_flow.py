@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from custom_components.cambridge_azur851.azur851 import Azur851ConnectionError
+from custom_components.cambridge_azur851.azur851 import (
+    Azur851ConnectionError,
+    Azur851NoResponseError,
+)
 from custom_components.cambridge_azur851.const import (
     CONF_MODEL,
     CONF_SERIAL_URL,
@@ -79,6 +82,18 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_user_flow_no_response(hass: HomeAssistant) -> None:
+    """A port that opens but gets no reply shows the dedicated error."""
+    flow_id = await _start(hass)
+    with patch(_TEST_CONNECTION, side_effect=Azur851NoResponseError):
+        result = await hass.config_entries.flow.async_configure(
+            flow_id, {CONF_MODEL: "851A", CONF_SERIAL_URL: "/dev/ttyUSB0"}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "no_response"}
 
 
 async def test_user_flow_unknown_error(hass: HomeAssistant) -> None:

@@ -12,6 +12,7 @@ the optional ``on_update`` callback so the coordinator can push to Home Assistan
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, Self
 
@@ -22,10 +23,15 @@ from .exceptions import (
     Azur851CommandError,
     Azur851ConnectionError,
     Azur851Error,
+    Azur851NoResponseError,
     Azur851ProtocolError,
 )
 from .models import DeviceState, ModelCapabilities, get_model_capabilities
 from .protocol import Command, Response, decode, encode
+
+# How long to wait for the device to answer a probe. The 851 replies within
+# milliseconds; this leaves headroom for a network serial proxy.
+PROBE_TIMEOUT: float = 2.0
 
 
 class Azur851Client:
@@ -47,6 +53,8 @@ class Azur851Client:
         self.on_update: Callable[[], None] | None = None
         # Set by the coordinator to track availability (True = up, False = down).
         self.on_connection_state: Callable[[bool], None] | None = None
+        # Resolved by the next valid inbound frame while a probe is in flight.
+        self._probe_waiter: asyncio.Future[Response] | None = None
 
     @classmethod
     def from_config(cls, data: dict[str, Any]) -> Self:
@@ -77,13 +85,38 @@ class Azur851Client:
         """Open the transport and start receiving updates."""
         await self._connection.async_open()
 
-    async def async_test_connection(self) -> None:
-        """Open the link, probe the device, then close. Used by the config flow."""
+    async def async_test_connection(
+        self, response_timeout: float = PROBE_TIMEOUT
+    ) -> None:
+        """Open the link, check the device answers, then close.
+
+        Used by the config flow. Raises ``Azur851ConnectionError`` if the port
+        cannot be opened, or ``Azur851NoResponseError`` if it opens but the
+        device stays silent.
+        """
         await self._connection.async_open()
         try:
-            await self._connection.async_write(encode(commands.get_protocol_version()))
+            await self.async_probe(response_timeout)
         finally:
             await self._connection.async_close()
+
+    async def async_probe(self, response_timeout: float = PROBE_TIMEOUT) -> Response:
+        """Ask for the protocol version and wait for the device to answer.
+
+        Any valid frame counts as an answer -- even a group-5 error proves the
+        device is there and listening. Returns the first frame received.
+        """
+        waiter: asyncio.Future[Response] = asyncio.get_running_loop().create_future()
+        self._probe_waiter = waiter
+        try:
+            await self._write(commands.get_protocol_version())
+            return await asyncio.wait_for(waiter, response_timeout)
+        except TimeoutError as err:
+            raise Azur851NoResponseError(
+                f"No response from the {self._model} within {response_timeout:g}s"
+            ) from err
+        finally:
+            self._probe_waiter = None
 
     async def async_close(self) -> None:
         """Close the underlying transport."""
@@ -145,6 +178,8 @@ class Azur851Client:
             response = decode(raw)
         except Azur851ProtocolError:
             return  # ignore unparseable noise on the line
+        if self._probe_waiter is not None and not self._probe_waiter.done():
+            self._probe_waiter.set_result(response)
         if response.is_error:
             return  # group-5 errors are not state; could be logged/raised later
         if self.apply_update(response) and self.on_update is not None:
@@ -182,6 +217,7 @@ __all__ = [
     "Azur851CommandError",
     "Azur851ConnectionError",
     "Azur851Error",
+    "Azur851NoResponseError",
     "Azur851ProtocolError",
     "DeviceState",
     "ModelCapabilities",

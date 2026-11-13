@@ -106,6 +106,11 @@ serial_proxy:
 
 - The config flow takes a single **Serial URL** (any of the forms above) plus the
   model; `Azur851Client.from_config` builds the connection with the model's baud.
+  Before creating the entry it **probes the device**: it sends *Get protocol
+  version* (`#2,02`) and waits up to 2 s for any valid frame. If the port opens
+  but nothing answers, the flow shows **no_response** (distinct from
+  **cannot_connect**) -- that points at wiring, the wrong port, or the wrong
+  model/baud rather than at the serial proxy.
 - `Azur851Connection` opens the link with `open_serial_connection`, then runs a
   **background read loop** (`reader.readuntil(b"\r")`) that pushes each complete
   frame to the client. This matches the push nature of the protocol (group-4

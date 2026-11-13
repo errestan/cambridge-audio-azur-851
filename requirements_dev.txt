@@ -4,8 +4,8 @@
 # the full test toolchain (pytest, pytest-asyncio, pytest-cov, etc.), so we pin
 # it and let it own those. Keep `homeassistant` matching the version it pins.
 # Requires Python >= 3.14.
-pytest-homeassistant-custom-component==0.13.340
-homeassistant==2026.6.4
+pytest-homeassistant-custom-component==0.13.375
+homeassistant==2026.10.4
 
 # Runtime dependency (also declared in manifest.json).
 serialx>=1.8.2   # serial transport (local / socket:// / esphome:// proxy)

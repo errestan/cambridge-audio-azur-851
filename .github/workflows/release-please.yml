@@ -15,7 +15,7 @@ jobs:
     steps:
       # Maintains a release PR; merging it tags the commit and publishes a
       # GitHub Release, which is what the "Latest release" badge reads.
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

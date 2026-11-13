@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable
 from typing import TYPE_CHECKING
 
 from homeassistant.components.media_player import (
@@ -11,8 +12,11 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .azur851 import Azur851Error
+from .azur851.models import ModelCapabilities
 from .entity import Azur851Entity
 
 if TYPE_CHECKING:
@@ -36,19 +40,12 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
 
     _attr_name = None  # Use the device name.
 
-    # TODO: derive the supported feature set from the model capability map.
-    _attr_supported_features = (
-        MediaPlayerEntityFeature.TURN_ON
-        | MediaPlayerEntityFeature.TURN_OFF
-        | MediaPlayerEntityFeature.VOLUME_SET
-        | MediaPlayerEntityFeature.VOLUME_STEP
-        | MediaPlayerEntityFeature.VOLUME_MUTE
-        | MediaPlayerEntityFeature.SELECT_SOURCE
-    )
-
     def __init__(self, coordinator: Azur851Coordinator) -> None:
         """Initialize the media player."""
         super().__init__(coordinator)
+        self._attr_supported_features = _supported_features(
+            coordinator.client.capabilities
+        )
 
     # --- State (read from coordinator.data) --------------------------------
 
@@ -88,25 +85,44 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
 
     async def async_turn_on(self) -> None:
         """Turn the device on."""
-        await self.coordinator.client.async_power(True)
-        await self.coordinator.async_request_refresh()
+        await self._async_send(self.coordinator.client.async_power(True))
 
     async def async_turn_off(self) -> None:
         """Put the device into standby."""
-        await self.coordinator.client.async_power(False)
-        await self.coordinator.async_request_refresh()
+        await self._async_send(self.coordinator.client.async_power(False))
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set the volume (0..1)."""
-        await self.coordinator.client.async_set_volume(volume)
-        await self.coordinator.async_request_refresh()
+        await self._async_send(self.coordinator.client.async_set_volume(volume))
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute."""
-        await self.coordinator.client.async_mute(mute)
-        await self.coordinator.async_request_refresh()
+        await self._async_send(self.coordinator.client.async_mute(mute))
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source."""
-        await self.coordinator.client.async_select_source(source)
-        await self.coordinator.async_request_refresh()
+        await self._async_send(self.coordinator.client.async_select_source(source))
+
+    async def _async_send(self, command: Awaitable[None]) -> None:
+        """Send a command, surfacing link/device errors as HomeAssistantError.
+
+        No refresh afterwards: the device confirms every change with a group-4
+        frame, which arrives through the push path.
+        """
+        try:
+            await command
+        except Azur851Error as err:
+            raise HomeAssistantError(f"Azur 851 command failed: {err}") from err
+
+
+def _supported_features(caps: ModelCapabilities) -> MediaPlayerEntityFeature:
+    """Build the entity's feature set from the model's capability map."""
+    features = MediaPlayerEntityFeature.TURN_ON | MediaPlayerEntityFeature.TURN_OFF
+    if caps.has_volume:
+        features |= MediaPlayerEntityFeature.VOLUME_SET
+        features |= MediaPlayerEntityFeature.VOLUME_STEP
+    if caps.has_mute:
+        features |= MediaPlayerEntityFeature.VOLUME_MUTE
+    if caps.has_source_select and caps.sources:
+        features |= MediaPlayerEntityFeature.SELECT_SOURCE
+    return features

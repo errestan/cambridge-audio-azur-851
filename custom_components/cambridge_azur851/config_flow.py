@@ -12,26 +12,33 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TextSelector,
-    TextSelectorConfig,
-    TextSelectorType,
+    SerialPortSelector,
 )
 
-from .azur851 import (
-    Azur851Client,
-    Azur851ConnectionError,
-    async_discover_ports,
-    build_serial_url,
-)
-from .const import (
-    CONF_KEY,
-    CONF_MODEL,
-    CONF_SERIAL_URL,
-    DOMAIN,
-    SUPPORTED_MODELS,
-)
+from .azur851 import Azur851Client, Azur851ConnectionError
+from .const import CONF_MODEL, CONF_SERIAL_URL, DOMAIN, SUPPORTED_MODELS
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# SerialPortSelector is Home Assistant's own serial picker: it lists local ports
+# and ESPHome serial proxies. Proxy ports come back as `esphome-hass://` URLs,
+# which serialx opens over Home Assistant's existing (already authenticated)
+# ESPHome API connection -- so no separate encryption key is needed.
+_FORM_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_MODEL): SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    SelectOptionDict(value=model, label=model)
+                    for model in SUPPORTED_MODELS
+                ],
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Required(CONF_SERIAL_URL): SerialPortSelector(),
+    }
+)
 
 
 class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -42,7 +49,7 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Pick a discovered port (or type a URL) and the model."""
+        """Pick a serial port (local or ESPHome proxy) and the model."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -58,14 +65,16 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=await self._async_form_schema(),
+            data_schema=self.add_suggested_values_to_schema(
+                _FORM_SCHEMA, user_input or {}
+            ),
             errors=errors,
         )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Change the connection (URL / encryption key / model) of an entry."""
+        """Change the connection (serial port / model) of an entry."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
 
@@ -82,19 +91,17 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=self.add_suggested_values_to_schema(
-                await self._async_form_schema(), suggested
+                _FORM_SCHEMA, user_input or suggested
             ),
             errors=errors,
         )
 
     @staticmethod
     def _entry_data(user_input: dict[str, Any]) -> dict[str, Any]:
-        """Build stored entry data, folding any encryption key into the URL."""
+        """Build stored entry data from the form input."""
         return {
             CONF_MODEL: user_input[CONF_MODEL],
-            CONF_SERIAL_URL: build_serial_url(
-                user_input[CONF_SERIAL_URL], user_input.get(CONF_KEY)
-            ),
+            CONF_SERIAL_URL: user_input[CONF_SERIAL_URL],
         }
 
     async def _async_validate(self, data: dict[str, Any]) -> dict[str, str]:
@@ -102,42 +109,10 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             client = Azur851Client.from_config(data)
             await client.async_test_connection()
-        except Azur851ConnectionError:
+        except Azur851ConnectionError as err:
+            _LOGGER.warning("Cannot connect to Azur 851: %s", err)
             return {"base": "cannot_connect"}
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Unexpected error validating Azur 851 connection")
             return {"base": "unknown"}
         return {}
-
-    async def _async_form_schema(self) -> vol.Schema:
-        """Build the form schema, populating the port picker from discovery."""
-        ports = await async_discover_ports()
-        port_options = [
-            SelectOptionDict(value=port.device, label=port.label) for port in ports
-        ]
-        return vol.Schema(
-            {
-                vol.Required(CONF_MODEL): SelectSelector(
-                    SelectSelectorConfig(
-                        options=[
-                            SelectOptionDict(value=model, label=model)
-                            for model in SUPPORTED_MODELS
-                        ],
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                # custom_value=True lets the user pick a discovered port OR type a
-                # URL (socket://host:port, esphome://host:6053/?port_name=...).
-                vol.Required(CONF_SERIAL_URL): SelectSelector(
-                    SelectSelectorConfig(
-                        options=port_options,
-                        custom_value=True,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                # Only needed for an encrypted ESPHome serial proxy.
-                vol.Optional(CONF_KEY): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
-                ),
-            }
-        )

@@ -17,12 +17,7 @@ from typing import Any, Self
 
 from . import commands
 from .commands import INPUT_MAX, INPUT_MIN, Control, Group
-from .connection import (
-    Azur851Connection,
-    DiscoveredPort,
-    async_discover_ports,
-    build_serial_url,
-)
+from .connection import Azur851Connection
 from .exceptions import (
     Azur851CommandError,
     Azur851ConnectionError,
@@ -189,8 +184,5 @@ __all__ = [
     "Azur851Error",
     "Azur851ProtocolError",
     "DeviceState",
-    "DiscoveredPort",
     "ModelCapabilities",
-    "async_discover_ports",
-    "build_serial_url",
 ]

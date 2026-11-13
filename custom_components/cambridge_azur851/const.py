@@ -10,12 +10,10 @@ MANUFACTURER: Final = "Cambridge Audio"
 
 # --- Config entry keys -----------------------------------------------------
 CONF_MODEL: Final = "model"
-# A serialx URL: a local path (/dev/ttyUSB0), a socket:// bridge, or an
-# esphome:// serial proxy. Passed straight to serialx.open_serial_connection.
+# A serialx URL as returned by Home Assistant's serial port selector: a local
+# path (/dev/ttyUSB0), an ESPHome serial proxy (esphome-hass://...), or a typed
+# socket:// / esphome:// URL. Passed straight to serialx.open_serial_connection.
 CONF_SERIAL_URL: Final = "serial_url"
-# Optional ESPHome API encryption key (Noise PSK), folded into an esphome:// URL
-# as the `key=` query parameter. Ignored for non-esphome URLs.
-CONF_KEY: Final = "encryption_key"
 
 # --- Defaults --------------------------------------------------------------
 # Baud is model-dependent (851A=9600, 851E=115200, ...); the authoritative

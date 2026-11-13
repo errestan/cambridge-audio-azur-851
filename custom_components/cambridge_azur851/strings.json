@@ -3,26 +3,18 @@
     "step": {
       "user": {
         "title": "Cambridge Audio Azur 851",
-        "description": "Choose the model, then pick a detected serial port or type a connection URL. Examples: a local port `/dev/ttyUSB0`, a network bridge `socket://192.168.1.50:4001`, or an ESPHome serial proxy `esphome://192.168.1.42:6053/?port_name=851A`.",
+        "description": "Choose the model and the serial port the amplifier is connected to. ESPHome serial proxies (e.g. a Home Assistant Connect AUX-2) appear in the list once the ESPHome device is set up in Home Assistant.",
         "data": {
           "model": "Model",
-          "serial_url": "Serial port or URL",
-          "encryption_key": "ESPHome encryption key"
-        },
-        "data_description": {
-          "encryption_key": "Only for an encrypted ESPHome serial proxy: the API encryption key (Noise PSK) from the proxy device's `api: encryption: key:`. Leave blank for local ports or socket:// bridges."
+          "serial_url": "Serial port"
         }
       },
       "reconfigure": {
         "title": "Reconfigure Azur 851",
-        "description": "Update the model or serial connection for this device. Re-enter the ESPHome encryption key if the proxy uses one.",
+        "description": "Update the model or serial port for this device.",
         "data": {
           "model": "Model",
-          "serial_url": "Serial port or URL",
-          "encryption_key": "ESPHome encryption key"
-        },
-        "data_description": {
-          "encryption_key": "Only for an encrypted ESPHome serial proxy: the API encryption key (Noise PSK) from the proxy device's `api: encryption: key:`. Leave blank for local ports or socket:// bridges."
+          "serial_url": "Serial port"
         }
       }
     },

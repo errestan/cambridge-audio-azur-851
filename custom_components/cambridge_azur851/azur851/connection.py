@@ -84,7 +84,10 @@ class Azur851Connection:
             self._reader, self._writer = await serialx.open_serial_connection(
                 self._url, baudrate=self._baudrate
             )
-        except (serialx.SerialException, OSError, ValueError) as err:
+        except Exception as err:
+            # Broad on purpose: besides SerialException/OSError, an ESPHome proxy
+            # can raise e.g. RuntimeError, or Home Assistant's "ESPHome not loaded
+            # yet" error -- any of which must not escape the reconnect loop.
             raise Azur851ConnectionError(f"Could not open {self._url}: {err}") from err
         self._read_task = asyncio.create_task(self._read_loop())
         if self.on_connection_state is not None:

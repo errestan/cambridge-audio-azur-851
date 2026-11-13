@@ -90,6 +90,11 @@ custom_components/cambridge_azur851/
 
 ## Installation
 
+**Requires Home Assistant 2026.7 or newer.** The integration needs `serialx`
+1.8.2+, and Home Assistant pins its own serialx version — 2026.7.0 is the first
+release that ships 1.8.2 (2026.5/2026.6 ship 1.7.0/1.8.0, so it would fail to
+load there).
+
 ### HACS (custom repository)
 1. Add this repository as a custom repository in HACS (category: *Integration*).
 2. Install **Cambridge Audio Azur 851**.

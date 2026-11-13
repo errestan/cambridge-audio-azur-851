@@ -79,6 +79,18 @@ async def test_setup_creates_media_player(
     assert len(hass.states.async_all("media_player")) == 1
 
 
+async def test_setup_requests_state(
+    hass: HomeAssistant, fake_link: list[asyncio.StreamReader]
+) -> None:
+    """On connect, Volume stop is sent so the device reports its volume."""
+    writes: list[bytes] = []
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_FakeWriter, "write", lambda self, data: writes.append(data))
+        await _setup(hass)
+
+    assert b"#1,16,\r" in writes
+
+
 async def test_push_updates_entity_state(
     hass: HomeAssistant, fake_link: list[asyncio.StreamReader]
 ) -> None:

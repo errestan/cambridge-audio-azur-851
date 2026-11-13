@@ -117,11 +117,16 @@ over-temperature · `04` clipping · `05` mains fail · `06` speaker fail.
 ## Implementation implications
 
 - **Push, not poll.** There is no "read all state" command — current values are
-  learned only from group-4 updates. The integration should ideally hold the
-  serial link open and parse unsolicited frames (i.e. lean toward `local_push`).
-  The current `Azur851Client` accumulates state via `apply_update()` and
-  `async_poll_state()` returns the last known snapshot. A read loop in
-  `connection.py` is the remaining piece. See `manifest.json` `iot_class`.
+  learned only from group-4 updates, so the integration holds the serial link
+  open and a read loop in `connection.py` feeds unsolicited frames to
+  `Azur851Client.apply_update()` (`iot_class: local_push`).
+- **Learning state on connect.** Only volume can be read on demand: *Volume
+  stop* (`#1,16,`) is a no-op when no ramp is running and is answered with
+  `#4,16,<level>`. It is sent on every (re)connect. Power, mute and source stay
+  unknown until the device reports a change — we never send a command that would
+  change them just to learn their value.
+- **No-data frames keep the trailing separator**: e.g. `#1,16,\r`, `#2,01,\r`,
+  as in the official examples.
 - **Mute inversion** differs between the control command (#12, `0` = on) and the
   update (#12, `1` = on). Handled in `commands.mute()` and `Client.apply_update()`.
 - **Per-model baud & volume range** live in `azur851/models.py`, keyed by model.

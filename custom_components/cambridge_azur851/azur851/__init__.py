@@ -118,6 +118,16 @@ class Azur851Client:
         finally:
             self._probe_waiter = None
 
+    async def async_request_state(self) -> None:
+        """Ask the device to report whatever state it can without changing it.
+
+        The 851 has no state queries, so only volume can be learned on demand:
+        *Volume stop* is a no-op when no ramp is running, and the device answers
+        it with ``#4,16,<level>``. Power, mute and source are learned only from
+        the unsolicited updates sent when they change.
+        """
+        await self._write(commands.volume_stop())
+
     async def async_close(self) -> None:
         """Close the underlying transport."""
         await self._connection.async_close()

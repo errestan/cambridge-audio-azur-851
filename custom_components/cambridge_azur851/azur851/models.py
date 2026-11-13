@@ -6,9 +6,9 @@ official Serial Control Protocol documents:
   - 851A: 9600 baud, volume 00-96, has speaker select / bass / treble.
   - 851E: 115200 baud (default; also 38400/9600), volume 00-91, no tone controls.
 
-851W (power amp), 851N (network player) and 851C (CD player) have separate
-command sets; their entries below are conservative placeholders -- consult their
-RS232 code pages before relying on them (see docs/protocol.md).
+The 851W (power amp), 851N (network player), 851C (CD player) and 851D (DAC)
+have separate command sets that are not implemented; any model without an entry
+here gets the generic (851A-like) profile from ``get_model_capabilities``.
 """
 
 from __future__ import annotations
@@ -67,16 +67,6 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
         sources=dict(_SEVEN_INPUTS),
         volume_max=91,
     ),
-    # TODO: verify against each model's RS232 code page.
-    "851W": ModelCapabilities(
-        model="851W",
-        has_volume=False,
-        has_mute=False,
-        has_source_select=False,
-    ),
-    "851N": ModelCapabilities(model="851N"),
-    "851C": ModelCapabilities(model="851C"),
-    "851D": ModelCapabilities(model="851D"),
 }
 
 

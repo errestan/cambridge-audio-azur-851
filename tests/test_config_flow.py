@@ -43,6 +43,17 @@ async def _start(hass: HomeAssistant) -> str:
     return result["flow_id"]
 
 
+async def test_user_form_offers_supported_models_only(hass: HomeAssistant) -> None:
+    """Only models with a verified command map can be chosen."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    model_selector = result["data_schema"].schema[CONF_MODEL]
+    options = [opt["value"] for opt in model_selector.config["options"]]
+
+    assert options == ["851A", "851E"]
+
+
 async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
     """A valid connection creates an entry with the expected data."""
     flow_id = await _start(hass)

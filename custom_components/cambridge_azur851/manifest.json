@@ -3,7 +3,7 @@
   "name": "Cambridge Audio Azur 851",
   "codeowners": ["@errestan"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["usb"],
   "documentation": "https://github.com/errestan/cambridge-audio-azur-851",
   "integration_type": "device",
   "iot_class": "local_push",

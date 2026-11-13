@@ -51,16 +51,28 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
         """Mark entities available/unavailable as the link comes and goes."""
         if connected:
             self.async_set_updated_data(self.client.state)
+            # Runs on first connect and every reconnect; the reply arrives as a
+            # normal push update.
+            self.config_entry.async_create_background_task(
+                self.hass, self._async_request_state(), "azur851_request_state"
+            )
         else:
             self.async_set_update_error(
                 Azur851ConnectionError("Connection to Azur 851 lost")
             )
 
+    async def _async_request_state(self) -> None:
+        """Ask the device for its current state, ignoring a dropped link."""
+        try:
+            await self.client.async_request_state()
+        except Azur851Error as err:
+            _LOGGER.debug("Could not request Azur 851 state: %s", err)
+
     async def _async_update_data(self) -> DeviceState:
         """Ensure the connection is open; return the latest known state.
 
-        Called once on first refresh. After that, updates arrive via push.
-        TODO: add reconnection handling if the link drops.
+        Called once on first refresh. After that, updates arrive via push, and
+        the connection reconnects on its own if the link drops.
         """
         try:
             if not self.client.is_open:

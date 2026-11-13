@@ -6,15 +6,17 @@ These drive a fake serialx link and do not require real hardware.
 from __future__ import annotations
 
 import asyncio
-import urllib.parse
-from types import SimpleNamespace
 
 import pytest
 import serialx
+from custom_components.cambridge_azur851.azur851 import Azur851Client
 from custom_components.cambridge_azur851.azur851.connection import (
     Azur851Connection,
-    async_discover_ports,
-    build_serial_url,
+    redact_url,
+)
+from custom_components.cambridge_azur851.azur851.exceptions import (
+    Azur851ConnectionError,
+    Azur851NoResponseError,
 )
 
 
@@ -111,90 +113,85 @@ async def test_close_stops_reconnect(fake_serial) -> None:
     assert calls["count"] == count_after_close
 
 
-async def test_discover_ports_dedup_and_labels(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Discovery merges platforms, dedups by device, and builds labels."""
-    device = SimpleNamespace(
-        device="/dev/ttyUSB0",
-        resolved_device="/dev/ttyUSB0",
-        manufacturer="FTDI",
-        product="FT232R",
-        description="ttyUSB0",
-    )
-    proxy = SimpleNamespace(
-        device="esphome://1.2.3.4:6053/?port_name=851A",
-        resolved_device="esphome://1.2.3.4:6053/?port_name=851A",
-        manufacturer=None,
-        product=None,
-        description="851A",
-    )
+async def test_open_wraps_non_serial_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any open failure (e.g. ESPHome not loaded yet) becomes a connection error."""
 
-    async def _list(platform):
-        if platform is serialx.Platform.DEVICE:
-            return [device, device]  # duplicate to exercise dedup
-        if platform is serialx.Platform.ESPHOME:
-            return [proxy]
-        return []
+    async def _open(url: str, baudrate: int | None = None):
+        raise RuntimeError("ESPHome has not loaded yet")
 
-    monkeypatch.setattr(serialx, "async_list_serial_ports", _list)
-    ports = await async_discover_ports()
+    monkeypatch.setattr(serialx, "open_serial_connection", _open)
+    conn = Azur851Connection("esphome-hass://esphome/abc?port_name=851A", 9600)
 
-    assert [p.device for p in ports] == [
-        "/dev/ttyUSB0",
-        "esphome://1.2.3.4:6053/?port_name=851A",
-    ]
-    assert ports[0].label == "FTDI FT232R (/dev/ttyUSB0)"
-    assert ports[1].label == "851A (esphome://1.2.3.4:6053/?port_name=851A)"
+    with pytest.raises(Azur851ConnectionError):
+        await conn.async_open()
+    assert conn.is_open is False
 
 
-async def test_discover_ports_swallows_platform_errors(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "reply",
+    [b"#3,02,2.4\r", b"#5,08\r"],
+    ids=["protocol-version", "error-frame"],
+)
+async def test_test_connection_succeeds_on_reply(
+    fake_serial, monkeypatch: pytest.MonkeyPatch, reply: bytes
 ) -> None:
-    """A platform with no registered handler is skipped, not fatal."""
+    """Any valid frame (even a group-5 error) proves the device is there."""
+    readers, _ = fake_serial
+    # The "device" answers whatever is written to it.
+    monkeypatch.setattr(
+        _FakeWriter, "write", lambda self, data: readers[-1].feed_data(reply)
+    )
+    client = Azur851Client(Azur851Connection("fake://x", 9600), "851A")
 
-    async def _list(platform):
-        if platform is serialx.Platform.DEVICE:
-            return [
-                SimpleNamespace(
-                    device="/dev/ttyS0",
-                    description="ttyS0",
-                    manufacturer=None,
-                    product=None,
-                )
-            ]
-        raise serialx.SerialException("no handler for this scheme")
+    await client.async_test_connection()
 
-    monkeypatch.setattr(serialx, "async_list_serial_ports", _list)
-    ports = await async_discover_ports()
-
-    assert [p.device for p in ports] == ["/dev/ttyS0"]
+    assert client.is_open is False  # the probe link is closed afterwards
 
 
-def _query(url: str) -> dict[str, str]:
-    return dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+async def test_test_connection_no_response(fake_serial) -> None:
+    """A silent device raises Azur851NoResponseError and the link is closed."""
+    client = Azur851Client(Azur851Connection("fake://x", 9600), "851A")
+
+    with pytest.raises(Azur851NoResponseError):
+        await client.async_test_connection(response_timeout=0.05)
+    assert client.is_open is False
 
 
-def test_build_serial_url_adds_key_to_esphome() -> None:
-    """An ESPHome URL gains the key as a query parameter, keeping port_name."""
-    url = build_serial_url("esphome://1.2.3.4:6053/?port_name=851A", "SECRET_PSK")
-    query = _query(url)
-    assert query == {"port_name": "851A", "key": "SECRET_PSK"}
-    assert url.startswith("esphome://1.2.3.4:6053/")
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("/dev/ttyUSB0", "/dev/ttyUSB0"),
+        ("socket://10.0.0.9:4001", "socket://10.0.0.9:4001"),
+        (
+            "esphome-hass://esphome/01ABC?port_name=RS-232+Port+1",
+            "esphome-hass://esphome/01ABC?port_name=RS-232+Port+1",
+        ),
+        (
+            "esphome://10.0.0.5:6053/?port_name=851A&key=SECRET",
+            "esphome://10.0.0.5:6053/?port_name=851A&key=**REDACTED**",
+        ),
+        (
+            "esphome://10.0.0.5/?noise_psk=SECRET&password=PW",
+            "esphome://10.0.0.5/?noise_psk=**REDACTED**&password=**REDACTED**",
+        ),
+    ],
+)
+def test_redact_url(url: str, expected: str) -> None:
+    """Only credential parameters are masked; everything else is kept."""
+    assert redact_url(url) == expected
 
 
-def test_build_serial_url_no_key_is_unchanged() -> None:
-    """A blank/absent key leaves the URL alone."""
-    url = "esphome://1.2.3.4:6053/?port_name=851A"
-    assert build_serial_url(url, None) == url
-    assert build_serial_url(url, "") == url
+async def test_open_error_does_not_leak_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neither our message nor serialx's echoed URL exposes the key."""
+    url = "esphome://10.0.0.5:6053/?port_name=851A&key=SECRET"
 
+    async def _open(url_: str, baudrate: int | None = None):
+        raise OSError(f"cannot reach {url_}")
 
-def test_build_serial_url_ignores_non_esphome() -> None:
-    """The key only applies to esphome:// URLs."""
-    for url in ("/dev/ttyUSB0", "socket://192.168.1.50:4001"):
-        assert build_serial_url(url, "SECRET_PSK") == url
+    monkeypatch.setattr(serialx, "open_serial_connection", _open)
+    conn = Azur851Connection(url, 9600)
 
-
-def test_build_serial_url_preserves_existing_key() -> None:
-    """An explicit key already in the URL is not overwritten."""
-    url = "esphome://1.2.3.4/?port_name=851A&key=INLINE"
-    assert _query(build_serial_url(url, "OTHER"))["key"] == "INLINE"
+    with pytest.raises(Azur851ConnectionError) as excinfo:
+        await conn.async_open()
+    assert "SECRET" not in str(excinfo.value)
+    assert "port_name=851A" in str(excinfo.value)

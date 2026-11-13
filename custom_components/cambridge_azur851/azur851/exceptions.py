@@ -11,6 +11,14 @@ class Azur851ConnectionError(Azur851Error):
     """Raised when the transport cannot reach the device."""
 
 
+class Azur851NoResponseError(Azur851ConnectionError):
+    """Raised when the port opens but the device does not answer a probe.
+
+    Usually wiring (TX/RX swapped, wrong cable), the wrong port, or a baud-rate
+    mismatch -- the link to the serial adapter/proxy itself is fine.
+    """
+
+
 class Azur851ProtocolError(Azur851Error):
     """Raised when a frame cannot be parsed."""
 

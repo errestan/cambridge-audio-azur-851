@@ -50,7 +50,17 @@ await writer.wait_closed()
 |------------|-------------|
 | Local serial port | `/dev/ttyUSB0`, `/dev/serial/by-id/...` |
 | Network bridge (ser2net/socat) | `socket://192.168.1.50:4001` |
-| ESPHome serial proxy | `esphome://<host>[:6053]/?port_name=<name>[&key=<noise_psk>]` |
+| ESPHome serial proxy (via HA) | `esphome-hass://esphome/<esphome_entry_id>?port_name=<name>` |
+| ESPHome serial proxy (direct) | `esphome://<host>[:6053]/?port_name=<name>[&key=<noise_psk>]` |
+
+**Use `esphome-hass://` under Home Assistant.** Home Assistant's ESPHome
+integration registers this scheme with serialx: it opens the proxy over HA's
+*existing* ESPHome API connection for that config entry, so it is already
+authenticated. HA's `SerialPortSelector` returns these URLs for proxy ports. The
+raw `esphome://` form opens a **second** API connection; against a device with
+API encryption (e.g. a Home Assistant Connect AUX-2) it fails with "Connection
+requires encryption" unless the `key=` is supplied. Until the ESPHome integration
+has loaded, the `usb` integration's stub handler raises `ConfigEntryNotReady`.
 
 ESPHome proxy URL parameters, verified from the serialx source
 (`serialx/platforms/serial_esphome.py`, v1.8.2):
@@ -69,9 +79,8 @@ So an encrypted proxy is addressed as:
 esphome://192.168.1.42:6053/?port_name=851A&key=<base64-noise-psk>
 ```
 
-The config flow has a separate optional **ESPHome encryption key** field; when
-set, `build_serial_url()` folds it into an `esphome://` URL as `key=` (it leaves
-non-esphome URLs and URLs that already contain a key untouched).
+This direct form is only needed outside Home Assistant (or for a proxy HA does
+not manage); under HA prefer the `esphome-hass://` URL from the port selector.
 
 ### ESPHome side (proxy device YAML)
 
@@ -97,6 +106,11 @@ serial_proxy:
 
 - The config flow takes a single **Serial URL** (any of the forms above) plus the
   model; `Azur851Client.from_config` builds the connection with the model's baud.
+  Before creating the entry it **probes the device**: it sends *Get protocol
+  version* (`#2,02`) and waits up to 2 s for any valid frame. If the port opens
+  but nothing answers, the flow shows **no_response** (distinct from
+  **cannot_connect**) -- that points at wiring, the wrong port, or the wrong
+  model/baud rather than at the serial proxy.
 - `Azur851Connection` opens the link with `open_serial_connection`, then runs a
   **background read loop** (`reader.readuntil(b"\r")`) that pushes each complete
   frame to the client. This matches the push nature of the protocol (group-4
@@ -120,19 +134,16 @@ Once open, if the read loop ends unexpectedly (EOF or I/O error) the connection:
 A deliberate `async_close()` sets a closing flag and cancels both the read and
 reconnect tasks, so unloading never triggers a reconnect.
 
-## Port discovery (config flow)
+## Port selection (config flow)
 
-`azur851.async_discover_ports()` enumerates `serialx.Platform.DEVICE` (local
-hardware) and `serialx.Platform.ESPHOME` (proxies, when Home Assistant has
-registered the handler), dedups by `device`, and builds a friendly label from
-`manufacturer`/`product`/`description`. A platform with no registered handler is
-skipped, never fatal. The config flow renders this as a `SelectSelector` with
-`custom_value=True`, so the user can **pick a detected port or type a URL**
-(`socket://...`, `esphome://...`) in the same field.
+The config flow uses Home Assistant's built-in `SerialPortSelector` (as core
+RS-232 integrations such as `denon_rs232` do), which lists local ports and
+ESPHome serial proxy ports. The manifest depends on `usb`, which provides the
+selector's backend and the `esphome-hass://` stub handler.
 
 ## Changing the connection later
 
 The integration supports Home Assistant's **reconfigure** flow (the entry's
 "Reconfigure" menu): the same form is shown pre-filled with the current model and
-URL, so the serial URL, encryption key, or model can be changed and re-validated
+URL, so the serial port or model can be changed and re-validated
 without removing and re-adding the device.

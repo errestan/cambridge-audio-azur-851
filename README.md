@@ -48,8 +48,9 @@ serial-to-network bridge (e.g. an ESPHome device, ser2net, or a USB-serial serve
 The transport uses Home Assistant's [`serialx`](https://github.com/puddly/serialx)
 library (HA 2026.5+), so a single **Serial URL** selects the backend
 transparently — a local port (`/dev/ttyUSB0`), a network bridge
-(`socket://host:port`), or an ESPHome serial proxy
-(`esphome://host:6053/?port_name=851A`). Because the device pushes state changes
+(`socket://host:port`), or an ESPHome serial proxy such as a Home Assistant
+Connect AUX-2 (`esphome-hass://…`, picked from Home Assistant's serial port
+selector). Because the device pushes state changes
 unsolicited, the connection runs a background read loop and the integration is
 `local_push`. See [`docs/transport.md`](docs/transport.md) and
 [`docs/protocol.md`](docs/protocol.md).
@@ -61,7 +62,7 @@ custom_components/cambridge_azur851/
 ├── __init__.py          # Integration setup: config entry load/unload, platform forwarding
 ├── manifest.json        # Integration metadata & dependencies
 ├── const.py             # Domain, config keys, supported models
-├── config_flow.py       # UI setup + reconfigure flow (port picker, model, optional key)
+├── config_flow.py       # UI setup + reconfigure flow (serial port selector, model)
 ├── coordinator.py       # Push coordinator: owns the connection, fans out updates
 ├── entity.py            # Shared base entity (device info, availability)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
@@ -70,7 +71,7 @@ custom_components/cambridge_azur851/
 │   └── en.json
 └── azur851/             # Standalone protocol library (no HA imports)
     ├── __init__.py      # Public client API
-    ├── connection.py    # serialx transport: read loop, auto-reconnect, discovery
+    ├── connection.py    # serialx transport: read loop, auto-reconnect
     ├── protocol.py      # Frame encode/decode for the Azur RS-232 protocol
     ├── commands.py      # Command & response definitions (command groups)
     ├── models.py        # Per-model capability maps + device state
@@ -99,11 +100,12 @@ custom_components/cambridge_azur851/
 ### Manual
 Copy `custom_components/cambridge_azur851/` into your Home Assistant `config/custom_components/` directory and restart.
 
-When adding the integration, choose the model and pick a detected serial port or
-type a connection URL (`/dev/ttyUSB0`, `socket://host:port`, or
-`esphome://host:6053/?port_name=…`); for an encrypted ESPHome proxy, also supply
-the encryption key. You can change any of these later via the entry's
-**Reconfigure** menu.
+When adding the integration, choose the model and pick the serial port from Home
+Assistant's serial port selector. It lists local ports and ESPHome serial proxies
+(e.g. a Home Assistant Connect AUX-2) — set the ESPHome device up in Home
+Assistant first; the proxy then reuses that already-encrypted connection, so no
+key is needed here. You can change either later via the entry's **Reconfigure**
+menu.
 
 ## Development
 
@@ -137,9 +139,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next imp
 - [x] Implement `connection.py` transport over `serialx` (open + read loop) — see [`docs/transport.md`](docs/transport.md)
 - [x] Push model: unsolicited group-4 updates via a read loop + `local_push` coordinator
 - [x] Reconnection / backoff when the serial link drops (entities go unavailable then recover)
-- [x] Config-flow port selector (discovered local/proxy ports + free-text URL)
-- [x] ESPHome serial-proxy auth: optional encryption key folded into the URL (`key=`)
-- [x] Reconfigure flow to change the URL / encryption key / model later
+- [x] Config flow uses Home Assistant's serial port selector (local ports + ESPHome proxies)
+- [x] Reconfigure flow to change the serial port / model later
 - [x] Tests: config flow, reconfigure, setup/coordinator/entity
 - [x] CI: GitHub Actions (pre-commit lint/type, pytest, hassfest, HACS validation)
 - [ ] Validate against real hardware

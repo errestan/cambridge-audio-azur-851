@@ -2,7 +2,8 @@
 
 Uses Home Assistant's ``serialx`` library, whose ``open_serial_connection`` URL
 handles local ports, ``socket://`` bridges (ser2net/socat) and ESPHome serial
-proxies transparently -- so this module does not care which is in use.
+proxies (``esphome-hass://`` / ``esphome://``) transparently -- so this module
+does not care which is in use.
 
 Because the 851 protocol is push-based (the device emits group-4 frames on every
 state change), the connection runs a background read loop and pushes each
@@ -19,7 +20,6 @@ import asyncio
 import logging
 import urllib.parse
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import serialx
 
@@ -35,65 +35,30 @@ _TERMINATOR_BYTES: bytes = TERMINATOR.encode("ascii")
 _RECONNECT_INITIAL_DELAY: float = 2.0
 _RECONNECT_MAX_DELAY: float = 60.0
 
-# serialx platforms to enumerate for the config-flow port picker: local hardware
-# and (when Home Assistant has registered it) ESPHome serial proxies.
-_DISCOVERY_PLATFORMS = (serialx.Platform.DEVICE, serialx.Platform.ESPHOME)
+
+# Query parameters that carry credentials (ESPHome API key / legacy password).
+_SECRET_PARAMS = frozenset({"key", "noise_psk", "password"})
+_REDACTED = "**REDACTED**"
 
 
-@dataclass(frozen=True)
-class DiscoveredPort:
-    """A serial port offered to the user, with a friendly label."""
+def redact_url(url: str) -> str:
+    """Return ``url`` with credential query parameters masked, for logging.
 
-    device: str  # the URL/path to pass to serialx
-    label: str
-
-
-def build_serial_url(url: str, key: str | None) -> str:
-    """Fold an ESPHome API encryption key into an ``esphome://`` URL.
-
-    serialx authenticates to an ESPHome serial proxy with the Noise PSK passed as
-    the ``key=`` query parameter. Discovery only emits ``port_name``, so this adds
-    the key the user supplied separately. Non-esphome URLs and blank keys are
-    returned unchanged; a key already present in the URL is preserved.
+    A typed ``esphome://`` URL can carry the API encryption key as ``key=``.
+    Other parameters (e.g. ``port_name``) are kept as they help debugging; URLs
+    without credentials are returned unchanged.
     """
-    if not key:
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    if not any(name.lower() in _SECRET_PARAMS for name, _ in query):
         return url
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme != "esphome":
-        return url
-    query = dict(urllib.parse.parse_qsl(parsed.query))
-    if "key" not in query and "noise_psk" not in query:
-        query["key"] = key
-    return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(query)))
-
-
-def _describe(port: serialx.SerialPortInfo) -> str:
-    """Build a human-friendly label for a discovered port."""
-    name = " ".join(p for p in (port.manufacturer, port.product) if p)
-    name = name or port.description or port.device
-    return f"{name} ({port.device})" if name != port.device else port.device
-
-
-async def async_discover_ports() -> list[DiscoveredPort]:
-    """Enumerate available serial ports (local + ESPHome proxies).
-
-    Best-effort: a platform with no registered handler (e.g. ``esphome://`` when
-    not running under Home Assistant) is skipped rather than raising.
-    """
-    found: list[DiscoveredPort] = []
-    seen: set[str] = set()
-    for platform in _DISCOVERY_PLATFORMS:
-        try:
-            ports = await serialx.async_list_serial_ports(platform)
-        except Exception as err:  # noqa: BLE001 - discovery must never break setup
-            _LOGGER.debug("Port discovery for %s skipped: %s", platform, err)
-            continue
-        for port in ports:
-            if port.device in seen:
-                continue
-            seen.add(port.device)
-            found.append(DiscoveredPort(port.device, _describe(port)))
-    return found
+    masked = [
+        (name, _REDACTED if name.lower() in _SECRET_PARAMS else value)
+        for name, value in query
+    ]
+    return urllib.parse.urlunsplit(
+        parts._replace(query=urllib.parse.urlencode(masked, safe="*"))
+    )
 
 
 class Azur851Connection:
@@ -115,6 +80,7 @@ class Azur851Connection:
     ) -> None:
         """Store connection parameters. The link is opened by ``async_open``."""
         self._url = url
+        self._log_url = redact_url(url)  # never log the raw URL
         self._baudrate = baudrate
         self._reconnect_initial = reconnect_initial
         self._reconnect_max = reconnect_max
@@ -145,8 +111,15 @@ class Azur851Connection:
             self._reader, self._writer = await serialx.open_serial_connection(
                 self._url, baudrate=self._baudrate
             )
-        except (serialx.SerialException, OSError, ValueError) as err:
-            raise Azur851ConnectionError(f"Could not open {self._url}: {err}") from err
+        except Exception as err:
+            # Broad on purpose: besides SerialException/OSError, an ESPHome proxy
+            # can raise e.g. RuntimeError, or Home Assistant's "ESPHome not loaded
+            # yet" error -- any of which must not escape the reconnect loop.
+            # serialx's message may echo the URL, so redact it there too.
+            reason = str(err).replace(self._url, self._log_url)
+            raise Azur851ConnectionError(
+                f"Could not open {self._log_url}: {reason}"
+            ) from err
         self._read_task = asyncio.create_task(self._read_loop())
         if self.on_connection_state is not None:
             self.on_connection_state(True)
@@ -186,10 +159,10 @@ class Azur851Connection:
                 try:
                     await self._connect()
                 except Azur851ConnectionError as err:
-                    _LOGGER.debug("Reconnect to %s failed: %s", self._url, err)
+                    _LOGGER.debug("Reconnect to %s failed: %s", self._log_url, err)
                     delay = min(delay * 2, self._reconnect_max)
                 else:
-                    _LOGGER.info("Reconnected to %s", self._url)
+                    _LOGGER.info("Reconnected to %s", self._log_url)
                     return
         finally:
             self._reconnect_task = None

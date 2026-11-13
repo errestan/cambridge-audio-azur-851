@@ -14,21 +14,20 @@ A custom [Home Assistant](https://www.home-assistant.io/) integration for contro
 > entity, and the config/reconfigure flows are implemented and unit-tested. Not
 > yet validated against real hardware. See [Roadmap](#roadmap).
 
-## Supported hardware (target)
+## Supported hardware
 
-The Azur 851 series shares a common RS-232 control protocol. Target devices:
+| Model  | Type                 | Status |
+|--------|----------------------|--------|
+| 851A   | Integrated amplifier | **Supported** — command map checked against Cambridge's 851A protocol V1.0 |
+| 851E   | Preamplifier         | **Supported** — checked against the 851E protocol V2.0 (115200 baud, volume 00–91) |
+| 851W   | Power amplifier      | Planned — separate command set, not implemented |
+| 851N   | Network player       | Planned — separate command set, not implemented |
+| 851C   | CD player            | Planned — separate command set, not implemented |
+| 851D   | DAC / preamplifier   | Planned — separate command set, not implemented |
 
-| Model  | Type                 | Primary platform        |
-|--------|----------------------|-------------------------|
-| 851A   | Integrated amplifier | `media_player`          |
-| 851E   | Preamplifier         | `media_player`          |
-| 851W   | Power amplifier      | `media_player` (limited)|
-| 851N   | Network player       | `media_player`          |
-| 851C   | CD player            | `media_player`          |
-| 851D   | DAC / preamplifier   | `media_player`          |
-
-> Initial development targets the **851A** integrated amplifier. Other models are
-> handled through per-model capability maps in `azur851/models.py`.
+Only supported models can be chosen during setup. Entries created for other
+models by earlier versions keep loading, but are driven with the 851A command
+set and log a warning at startup.
 
 ## How it connects
 

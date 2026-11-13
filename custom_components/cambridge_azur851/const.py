@@ -25,18 +25,10 @@ CONF_KEY: Final = "encryption_key"
 DEFAULT_BAUDRATE: Final = 9600
 
 # --- Supported models ------------------------------------------------------
+# Only models whose command map has been checked against Cambridge Audio's
+# official serial protocol documents are offered during setup. The 851W/N/C/D
+# use separate command sets that are not implemented yet (see docs/protocol.md).
 MODEL_851A: Final = "851A"
 MODEL_851E: Final = "851E"
-MODEL_851W: Final = "851W"
-MODEL_851N: Final = "851N"
-MODEL_851C: Final = "851C"
-MODEL_851D: Final = "851D"
 
-SUPPORTED_MODELS: Final = [
-    MODEL_851A,
-    MODEL_851E,
-    MODEL_851W,
-    MODEL_851N,
-    MODEL_851C,
-    MODEL_851D,
-]
+SUPPORTED_MODELS: Final = [MODEL_851A, MODEL_851E]

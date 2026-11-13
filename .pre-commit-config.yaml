@@ -19,15 +19,15 @@ repos:
         args: [--fix=lf]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.17.5
     hooks:
       # Lint (with autofix) then format, using config from pyproject.toml.
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
+    rev: v2.4.1
     hooks:
       # Type-check only the standalone protocol library, which has no
       # Home Assistant imports and so needs no heavy extra dependencies.

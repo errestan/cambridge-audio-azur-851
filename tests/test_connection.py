@@ -10,7 +10,10 @@ import asyncio
 import pytest
 import serialx
 from custom_components.cambridge_azur851.azur851 import Azur851Client
-from custom_components.cambridge_azur851.azur851.connection import Azur851Connection
+from custom_components.cambridge_azur851.azur851.connection import (
+    Azur851Connection,
+    redact_url,
+)
 from custom_components.cambridge_azur851.azur851.exceptions import (
     Azur851ConnectionError,
     Azur851NoResponseError,
@@ -152,3 +155,43 @@ async def test_test_connection_no_response(fake_serial) -> None:
     with pytest.raises(Azur851NoResponseError):
         await client.async_test_connection(response_timeout=0.05)
     assert client.is_open is False
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("/dev/ttyUSB0", "/dev/ttyUSB0"),
+        ("socket://10.0.0.9:4001", "socket://10.0.0.9:4001"),
+        (
+            "esphome-hass://esphome/01ABC?port_name=RS-232+Port+1",
+            "esphome-hass://esphome/01ABC?port_name=RS-232+Port+1",
+        ),
+        (
+            "esphome://10.0.0.5:6053/?port_name=851A&key=SECRET",
+            "esphome://10.0.0.5:6053/?port_name=851A&key=**REDACTED**",
+        ),
+        (
+            "esphome://10.0.0.5/?noise_psk=SECRET&password=PW",
+            "esphome://10.0.0.5/?noise_psk=**REDACTED**&password=**REDACTED**",
+        ),
+    ],
+)
+def test_redact_url(url: str, expected: str) -> None:
+    """Only credential parameters are masked; everything else is kept."""
+    assert redact_url(url) == expected
+
+
+async def test_open_error_does_not_leak_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neither our message nor serialx's echoed URL exposes the key."""
+    url = "esphome://10.0.0.5:6053/?port_name=851A&key=SECRET"
+
+    async def _open(url_: str, baudrate: int | None = None):
+        raise OSError(f"cannot reach {url_}")
+
+    monkeypatch.setattr(serialx, "open_serial_connection", _open)
+    conn = Azur851Connection(url, 9600)
+
+    with pytest.raises(Azur851ConnectionError) as excinfo:
+        await conn.async_open()
+    assert "SECRET" not in str(excinfo.value)
+    assert "port_name=851A" in str(excinfo.value)

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import urllib.parse
 from collections.abc import Callable
 
 import serialx
@@ -33,6 +34,31 @@ _TERMINATOR_BYTES: bytes = TERMINATOR.encode("ascii")
 # Reconnect backoff bounds (seconds).
 _RECONNECT_INITIAL_DELAY: float = 2.0
 _RECONNECT_MAX_DELAY: float = 60.0
+
+
+# Query parameters that carry credentials (ESPHome API key / legacy password).
+_SECRET_PARAMS = frozenset({"key", "noise_psk", "password"})
+_REDACTED = "**REDACTED**"
+
+
+def redact_url(url: str) -> str:
+    """Return ``url`` with credential query parameters masked, for logging.
+
+    A typed ``esphome://`` URL can carry the API encryption key as ``key=``.
+    Other parameters (e.g. ``port_name``) are kept as they help debugging; URLs
+    without credentials are returned unchanged.
+    """
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    if not any(name.lower() in _SECRET_PARAMS for name, _ in query):
+        return url
+    masked = [
+        (name, _REDACTED if name.lower() in _SECRET_PARAMS else value)
+        for name, value in query
+    ]
+    return urllib.parse.urlunsplit(
+        parts._replace(query=urllib.parse.urlencode(masked, safe="*"))
+    )
 
 
 class Azur851Connection:
@@ -54,6 +80,7 @@ class Azur851Connection:
     ) -> None:
         """Store connection parameters. The link is opened by ``async_open``."""
         self._url = url
+        self._log_url = redact_url(url)  # never log the raw URL
         self._baudrate = baudrate
         self._reconnect_initial = reconnect_initial
         self._reconnect_max = reconnect_max
@@ -88,7 +115,11 @@ class Azur851Connection:
             # Broad on purpose: besides SerialException/OSError, an ESPHome proxy
             # can raise e.g. RuntimeError, or Home Assistant's "ESPHome not loaded
             # yet" error -- any of which must not escape the reconnect loop.
-            raise Azur851ConnectionError(f"Could not open {self._url}: {err}") from err
+            # serialx's message may echo the URL, so redact it there too.
+            reason = str(err).replace(self._url, self._log_url)
+            raise Azur851ConnectionError(
+                f"Could not open {self._log_url}: {reason}"
+            ) from err
         self._read_task = asyncio.create_task(self._read_loop())
         if self.on_connection_state is not None:
             self.on_connection_state(True)
@@ -128,10 +159,10 @@ class Azur851Connection:
                 try:
                     await self._connect()
                 except Azur851ConnectionError as err:
-                    _LOGGER.debug("Reconnect to %s failed: %s", self._url, err)
+                    _LOGGER.debug("Reconnect to %s failed: %s", self._log_url, err)
                     delay = min(delay * 2, self._reconnect_max)
                 else:
-                    _LOGGER.info("Reconnected to %s", self._url)
+                    _LOGGER.info("Reconnected to %s", self._log_url)
                     return
         finally:
             self._reconnect_task = None

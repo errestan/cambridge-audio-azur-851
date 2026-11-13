@@ -1,0 +1,31 @@
+# Keeps CI actions and dev/test dependencies current. Weekly, grouped, so the
+# repo sees regular activity (which also stops GitHub from disabling the
+# scheduled Validate workflow after 60 days of inactivity).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    groups:
+      dev-dependencies:
+        patterns: ["*"]
+    ignore:
+      # Must match the version pytest-homeassistant-custom-component pins; it
+      # moves when that package is bumped, never on its own.
+      - dependency-name: homeassistant
+      # Lower bound tracks the oldest supported Home Assistant (see hacs.json /
+      # manifest.json), not the newest serialx release.
+      - dependency-name: serialx

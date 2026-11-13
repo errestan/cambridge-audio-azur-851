@@ -15,7 +15,7 @@ from homeassistant.helpers.selector import (
     SerialPortSelector,
 )
 
-from .azur851 import Azur851Client, Azur851ConnectionError
+from .azur851 import Azur851Client, Azur851ConnectionError, Azur851NoResponseError
 from .const import CONF_MODEL, CONF_SERIAL_URL, DOMAIN, SUPPORTED_MODELS
 
 _LOGGER = logging.getLogger(__name__)
@@ -109,6 +109,9 @@ class Azur851ConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             client = Azur851Client.from_config(data)
             await client.async_test_connection()
+        except Azur851NoResponseError as err:
+            _LOGGER.warning("Azur 851 did not respond: %s", err)
+            return {"base": "no_response"}
         except Azur851ConnectionError as err:
             _LOGGER.warning("Cannot connect to Azur 851: %s", err)
             return {"base": "cannot_connect"}

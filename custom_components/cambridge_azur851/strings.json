@@ -20,6 +20,7 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to the device.",
+      "no_response": "The serial port opened, but the amplifier did not respond. Check it is connected to this port, the cable/wiring (TX/RX), and that the correct model is selected.",
       "unknown": "Unexpected error."
     },
     "abort": {

@@ -10,6 +10,9 @@ import asyncio
 import pytest
 import serialx
 from custom_components.cambridge_azur851.azur851.connection import Azur851Connection
+from custom_components.cambridge_azur851.azur851.exceptions import (
+    Azur851ConnectionError,
+)
 
 
 class _FakeWriter:
@@ -103,3 +106,17 @@ async def test_close_stops_reconnect(fake_serial) -> None:
     assert conn._closing is True
     assert conn.is_open is False
     assert calls["count"] == count_after_close
+
+
+async def test_open_wraps_non_serial_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any open failure (e.g. ESPHome not loaded yet) becomes a connection error."""
+
+    async def _open(url: str, baudrate: int | None = None):
+        raise RuntimeError("ESPHome has not loaded yet")
+
+    monkeypatch.setattr(serialx, "open_serial_connection", _open)
+    conn = Azur851Connection("esphome-hass://esphome/abc?port_name=851A", 9600)
+
+    with pytest.raises(Azur851ConnectionError):
+        await conn.async_open()
+    assert conn.is_open is False

@@ -21,6 +21,11 @@ from .protocol import Command
 INPUT_MIN: int = 1
 INPUT_MAX: int = 7
 
+# Device-native ranges for the level settings.
+BALANCE_MIN: int = 0  # max left
+BALANCE_CENTRE: int = 8
+BALANCE_MAX: int = 16  # max right
+
 
 class Group(IntEnum):
     """Command groups."""
@@ -56,9 +61,17 @@ class Control(IntEnum):
     BALANCE_LEFT = 19
     LCD_BRIGHTNESS = 20
     SPEAKER_SELECT = 21  # 851A only
-    SET_BASS = 24  # 851A only
-    SET_TREBLE = 25  # 851A only
+    # 24 (bass) and 25 (treble) are listed in the 851A V1.0 document, but a
+    # real 851A answers both with #5,08 (unknown command), so they are not used.
     SET_DIRECT = 26
+
+
+class Speakers(IntEnum):
+    """Speaker select data values (851A)."""
+
+    A = 0
+    AB = 1
+    B = 2
 
 
 class Setup(IntEnum):
@@ -123,6 +136,32 @@ def input_up() -> Command:
 def input_down() -> Command:
     """Step to the previous input."""
     return Command(Group.CONTROL, Control.INPUT_DOWN)
+
+
+def tape_monitor(on: bool) -> Command:
+    """Turn tape monitor (851E: record in) on or off."""
+    return Command(Group.CONTROL, Control.TAPE_MONITOR, "1" if on else "0")
+
+
+def set_balance(level: int) -> Command:
+    """Set balance, 0 (max left) .. 8 (centre) .. 16 (max right)."""
+    return Command(
+        Group.CONTROL,
+        Control.SET_BALANCE,
+        _level(level, BALANCE_MIN, BALANCE_MAX, "balance"),
+    )
+
+
+def speaker_select(speakers: Speakers) -> Command:
+    """Select speaker outputs A, A+B or B (851A only)."""
+    return Command(Group.CONTROL, Control.SPEAKER_SELECT, str(int(speakers)))
+
+
+def _level(level: int, low: int, high: int, what: str) -> str:
+    """Validate a level and format it as the two-digit data field."""
+    if not low <= level <= high:
+        raise ValueError(f"{what} out of range ({low}-{high}): {level}")
+    return f"{level:02d}"
 
 
 def set_direct(on: bool) -> Command:

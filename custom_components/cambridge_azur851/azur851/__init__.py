@@ -17,7 +17,7 @@ from collections.abc import Callable
 from typing import Any, Self
 
 from . import commands
-from .commands import INPUT_MAX, INPUT_MIN, Control, Group
+from .commands import INPUT_MAX, INPUT_MIN, Control, Group, Speakers
 from .connection import Azur851Connection
 from .exceptions import (
     Azur851CommandError,
@@ -28,6 +28,16 @@ from .exceptions import (
 )
 from .models import DeviceState, ModelCapabilities, get_model_capabilities
 from .protocol import Command, Response, decode, encode
+
+# Group-4 updates that carry a setting, mapped to the DeviceState field they set.
+_LEVEL_UPDATES: dict[int, str] = {
+    Control.SET_BALANCE: "balance",
+    Control.SPEAKER_SELECT: "speakers",
+}
+_SWITCH_UPDATES: dict[int, str] = {
+    Control.TAPE_MONITOR: "tape_monitor",
+    Control.SET_DIRECT: "direct",
+}
 
 # How long to wait for the device to answer a probe. The 851 replies within
 # milliseconds; this leaves headroom for a network serial proxy.
@@ -153,6 +163,22 @@ class Azur851Client:
             raise Azur851Error(f"Unknown source for {self._model}: {source!r}")
         await self._write(commands.select_input(selected.number, selected.balanced))
 
+    async def async_set_tape_monitor(self, on: bool) -> None:
+        """Turn tape monitor (851E: record in) on or off."""
+        await self._write(commands.tape_monitor(on))
+
+    async def async_set_direct(self, on: bool) -> None:
+        """Turn Direct mode on or off."""
+        await self._write(commands.set_direct(on))
+
+    async def async_set_balance(self, level: int) -> None:
+        """Set balance, device-native 0 (left) .. 8 (centre) .. 16 (right)."""
+        await self._write(commands.set_balance(level))
+
+    async def async_set_speakers(self, speakers: Speakers) -> None:
+        """Select speaker outputs A, A+B or B."""
+        await self._write(commands.speaker_select(speakers))
+
     # --- Volume scaling helpers -------------------------------------------
 
     def _scale_to_device(self, fraction: float) -> int:
@@ -211,6 +237,10 @@ class Azur851Client:
             self._state.source_code = number
             # "1" = balanced socket; no data = unbalanced (or single-socket).
             self._state.source_balanced = response.data == "1"
+        elif number in _SWITCH_UPDATES:
+            setattr(self._state, _SWITCH_UPDATES[number], response.data == "1")
+        elif number in _LEVEL_UPDATES:
+            setattr(self._state, _LEVEL_UPDATES[number], _to_int(response.data))
         else:
             return False
         return True
@@ -233,4 +263,5 @@ __all__ = [
     "Azur851ProtocolError",
     "DeviceState",
     "ModelCapabilities",
+    "Speakers",
 ]

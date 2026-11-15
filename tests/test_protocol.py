@@ -75,3 +75,15 @@ def test_select_input_range() -> None:
     assert encode(commands.select_input(1, balanced=False)) == b"#1,01,0\r"
     with pytest.raises(ValueError):
         commands.select_input(8)
+
+
+def test_setting_encoding() -> None:
+    """Setting commands use two-digit levels and validate their range."""
+    assert encode(commands.set_balance(8)) == b"#1,17,08\r"
+    assert encode(commands.speaker_select(commands.Speakers.AB)) == b"#1,21,1\r"
+    assert encode(commands.tape_monitor(True)) == b"#1,08,1\r"
+    assert encode(commands.set_direct(False)) == b"#1,26,0\r"
+    with pytest.raises(ValueError):
+        commands.set_balance(17)
+    with pytest.raises(ValueError):
+        commands.set_balance(-1)

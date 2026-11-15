@@ -3,8 +3,12 @@
 Models in the 851 series do NOT share one protocol profile. Verified from the
 official Serial Control Protocol documents:
 
-  - 851A: 9600 baud, volume 00-96, has speaker select / bass / treble.
-  - 851E: 115200 baud (default; also 38400/9600), volume 00-91, no tone controls.
+  - 851A: 9600 baud, volume 00-96, has speaker select.
+  - 851E: 115200 baud (default; also 38400/9600), volume 00-91, no speaker
+    select; its #08 is called "Record in" rather than "Tape monitor".
+
+The 851A document also lists bass/treble (#24/#25), but a real 851A rejects
+them as unknown commands, so they are not offered.
 
 The 851W (power amp), 851N (network player), 851C (CD player) and 851D (DAC)
 have separate command sets that are not implemented; any model without an entry
@@ -27,6 +31,12 @@ class DeviceState:
     # Whether the selected input is using its balanced (XLR) socket. Only
     # meaningful for inputs that have one (see ``Source.balanced``).
     source_balanced: bool = False
+    # Settings. Like power/mute/source, the device only reports these when they
+    # change, so they stay None until then. Levels are device-native.
+    tape_monitor: bool | None = None
+    balance: int | None = None  # 0 (left) .. 8 (centre) .. 16 (right)
+    speakers: int | None = None  # commands.Speakers value
+    direct: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +61,11 @@ class ModelCapabilities:
     has_volume: bool = True
     has_mute: bool = True
     has_source_select: bool = True
+    has_balance: bool = True
+    has_direct: bool = True
+    has_speaker_select: bool = False
+    # Control #08: "tape_monitor" on the 851A, "record_in" on the 851E, or None.
+    monitor: str | None = "tape_monitor"
     # Map of source name -> input (control command number + socket).
     sources: dict[str, Source] = field(default_factory=dict)
     # Device-native volume range, used to scale to/from Home Assistant's 0..1.
@@ -85,12 +100,14 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
         baudrate=9600,
         sources=_inputs(balanced=(1, 2)),
         volume_max=96,
+        has_speaker_select=True,
     ),
     "851E": ModelCapabilities(
         model="851E",
         baudrate=115200,
         sources=_inputs(balanced=(1, 2, 3)),
         volume_max=91,
+        monitor="record_in",
     ),
 }
 

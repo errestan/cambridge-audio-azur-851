@@ -27,5 +27,33 @@
       "already_configured": "This device is already configured.",
       "reconfigure_successful": "Connection settings updated."
     }
+  },
+  "entity": {
+    "number": {
+      "balance": {
+        "name": "Balance"
+      }
+    },
+    "select": {
+      "speakers": {
+        "name": "Speakers",
+        "state": {
+          "a": "A",
+          "ab": "A + B",
+          "b": "B"
+        }
+      }
+    },
+    "switch": {
+      "direct": {
+        "name": "Direct"
+      },
+      "tape_monitor": {
+        "name": "Tape monitor"
+      },
+      "record_in": {
+        "name": "Record in"
+      }
+    }
   }
 }

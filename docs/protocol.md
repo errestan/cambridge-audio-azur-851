@@ -130,6 +130,13 @@ over-temperature · `04` clipping · `05` mains fail · `06` speaker fail.
   with explicit data (`0`/`1`), never with no data, which would silently pick
   the unbalanced socket (851A) or toggle it (851E). Updates report the socket
   as `#4,01,1` (balanced) or `#4,01,` (unbalanced).
+- **Settings are push-only too.** Balance, speakers, Direct and tape monitor
+  are learned from their `#4` updates. Until one arrives, the
+  entity shows its pre-restart value as an assumed state (`RestoreEntity`).
+  Balance is shown centred on zero (device value − 8).
+- **Bass/treble (#24/#25) don't work on a real 851A.** It answers both with
+  `#5,08` (unknown command number) and never sends `#4,24`/`#4,25`, despite
+  the V1.0 document listing them. They are not exposed.
 - **No-data frames keep the trailing separator**: e.g. `#1,16,\r`, `#2,01,\r`,
   as in the official examples.
 - **Mute inversion** differs between the control command (#12, `0` = on) and the

@@ -66,7 +66,7 @@ Examples: `#1,11,0\r` (standby), `#1,13,10\r` (volume → 10), `#4,12,1\r` (mute
 
 | # | Command | Data |
 |---|---------|------|
-| 01–07 | Main input select (1–7) | opt. `1` = balanced (inputs 1 & 2 only); else unbalanced |
+| 01–07 | Main input select (1–7) | opt. `1` = balanced, `0` = unbalanced (dual-socket inputs only — 851A: 1 & 2; 851E: 1–3). No data = unbalanced on the 851A but **toggle** on the 851E |
 | 08 | Tape monitor | `0` off / `1` on |
 | 09 / 10 | Input up / down | — |
 | 11 | Power | `0` standby / `1` on |
@@ -125,6 +125,11 @@ over-temperature · `04` clipping · `05` mains fail · `06` speaker fail.
   `#4,16,<level>`. It is sent on every (re)connect. Power, mute and source stay
   unknown until the device reports a change — we never send a command that would
   change them just to learn their value.
+- **Balanced inputs are separate sources.** Dual-socket inputs appear twice in
+  the source list ("Input 1", "Input 1 (Balanced)") and are always selected
+  with explicit data (`0`/`1`), never with no data, which would silently pick
+  the unbalanced socket (851A) or toggle it (851E). Updates report the socket
+  as `#4,01,1` (balanced) or `#4,01,` (unbalanced).
 - **No-data frames keep the trailing separator**: e.g. `#1,16,\r`, `#2,01,\r`,
   as in the official examples.
 - **Mute inversion** differs between the control command (#12, `0` = on) and the

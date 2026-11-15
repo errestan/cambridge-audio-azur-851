@@ -72,8 +72,9 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
     @property
     def source(self) -> str | None:
         """Return the currently selected source."""
+        data = self.coordinator.data
         return self.coordinator.client.capabilities.source_name(
-            self.coordinator.data.source_code
+            data.source_code, data.source_balanced
         )
 
     @property

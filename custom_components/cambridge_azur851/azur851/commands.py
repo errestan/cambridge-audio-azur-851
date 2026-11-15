@@ -102,11 +102,17 @@ def volume_stop() -> Command:
     return Command(Group.CONTROL, Control.VOLUME_STOP)
 
 
-def select_input(index: int, balanced: bool = False) -> Command:
-    """Select main input 1-7. ``balanced`` applies to inputs 1 & 2 only."""
+def select_input(index: int, balanced: bool | None = None) -> Command:
+    """Select main input 1-7.
+
+    ``balanced`` picks the socket on inputs that have both (851A: 1-2, 851E:
+    1-3). Leave it ``None`` for single-socket inputs: on the 851E, sending no
+    data to a dual-socket input *toggles* the socket.
+    """
     if not INPUT_MIN <= index <= INPUT_MAX:
         raise ValueError(f"input index out of range (1-7): {index}")
-    return Command(Group.CONTROL, index, "1" if balanced else "")
+    data = "" if balanced is None else ("1" if balanced else "0")
+    return Command(Group.CONTROL, index, data)
 
 
 def input_up() -> Command:

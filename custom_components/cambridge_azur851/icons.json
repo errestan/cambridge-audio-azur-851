@@ -1,0 +1,25 @@
+{
+  "entity": {
+    "number": {
+      "balance": {
+        "default": "mdi:scale-balance"
+      }
+    },
+    "select": {
+      "speakers": {
+        "default": "mdi:speaker-multiple"
+      }
+    },
+    "switch": {
+      "direct": {
+        "default": "mdi:arrow-right-bold"
+      },
+      "tape_monitor": {
+        "default": "mdi:cassette"
+      },
+      "record_in": {
+        "default": "mdi:record-rec"
+      }
+    }
+  }
+}

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable
 from typing import TYPE_CHECKING
 
 from homeassistant.components.media_player import (
@@ -12,10 +11,8 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .azur851 import Azur851Error
 from .azur851.models import ModelCapabilities
 from .entity import Azur851Entity
 
@@ -103,17 +100,6 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
     async def async_select_source(self, source: str) -> None:
         """Select an input source."""
         await self._async_send(self.coordinator.client.async_select_source(source))
-
-    async def _async_send(self, command: Awaitable[None]) -> None:
-        """Send a command, surfacing link/device errors as HomeAssistantError.
-
-        No refresh afterwards: the device confirms every change with a group-4
-        frame, which arrives through the push path.
-        """
-        try:
-            await command
-        except Azur851Error as err:
-            raise HomeAssistantError(f"Azur 851 command failed: {err}") from err
 
 
 def _supported_features(caps: ModelCapabilities) -> MediaPlayerEntityFeature:

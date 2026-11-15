@@ -54,6 +54,21 @@ unsolicited, the connection runs a background read loop and the integration is
 `local_push`. See [`docs/transport.md`](docs/transport.md) and
 [`docs/protocol.md`](docs/protocol.md).
 
+## Entities
+
+| Entity | 851A | 851E | Notes |
+|--------|:----:|:----:|-------|
+| Media player | ✓ | ✓ | Power, volume, mute, source. Inputs with both XLR and RCA sockets are listed twice, e.g. "Input 1" and "Input 1 (Balanced)". |
+| Balance (number) | ✓ | ✓ | −8 (left) … +8 (right), 0 is centre |
+| Speakers (select) | ✓ | – | A, A + B, B |
+| Direct (switch) | ✓ | ✓ | |
+| Tape monitor / Record in (switch) | ✓ | ✓ | Named "Record in" on the 851E |
+
+The amp has no way to read a setting back; it reports each one only when it
+changes (from Home Assistant, the remote or the front panel). Until it does,
+these entities show the value they had before Home Assistant restarted, marked
+as an *assumed state*.
+
 ## Architecture
 
 ```
@@ -63,8 +78,12 @@ custom_components/cambridge_azur851/
 ├── const.py             # Domain, config keys, supported models
 ├── config_flow.py       # UI setup + reconfigure flow (serial port selector, model)
 ├── coordinator.py       # Push coordinator: owns the connection, fans out updates
-├── entity.py            # Shared base entity (device info, availability)
+├── entity.py            # Base entities (device info, availability, restore)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
+├── number.py            # Balance
+├── select.py            # Speaker outputs (A / A+B / B)
+├── switch.py            # Direct, tape monitor / record in
+├── icons.json           # Entity icons
 ├── strings.json         # UI strings
 ├── translations/
 │   └── en.json

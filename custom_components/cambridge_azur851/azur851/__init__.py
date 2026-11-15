@@ -148,10 +148,10 @@ class Azur851Client:
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source by its configured name."""
-        index = self._capabilities.sources.get(source)
-        if index is None:
+        selected = self._capabilities.sources.get(source)
+        if selected is None:
             raise Azur851Error(f"Unknown source for {self._model}: {source!r}")
-        await self._write(commands.select_input(index))
+        await self._write(commands.select_input(selected.number, selected.balanced))
 
     # --- Volume scaling helpers -------------------------------------------
 
@@ -209,6 +209,8 @@ class Azur851Client:
             self._state.volume_raw = _to_int(response.data)
         elif INPUT_MIN <= number <= INPUT_MAX:
             self._state.source_code = number
+            # "1" = balanced socket; no data = unbalanced (or single-socket).
+            self._state.source_balanced = response.data == "1"
         else:
             return False
         return True

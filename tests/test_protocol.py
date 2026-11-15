@@ -72,5 +72,6 @@ def test_select_input_range() -> None:
     """Input selection validates its range."""
     assert encode(commands.select_input(2)) == b"#1,02,\r"
     assert encode(commands.select_input(1, balanced=True)) == b"#1,01,1\r"
+    assert encode(commands.select_input(1, balanced=False)) == b"#1,01,0\r"
     with pytest.raises(ValueError):
         commands.select_input(8)

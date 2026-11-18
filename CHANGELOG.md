@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1](https://github.com/errestan/cambridge-audio-azur-851/compare/v0.2.0...v0.2.1) (2026-11-18)
+
+
+### Features
+
+* add the integration's icon and logo ([828fc61](https://github.com/errestan/cambridge-audio-azur-851/commit/828fc61119ad86e78e3e492dddca6e1f454bebfe))
+
+
+### Documentation
+
+* update the README status now it's tested on a real 851A ([92d9153](https://github.com/errestan/cambridge-audio-azur-851/commit/92d915345a55f4bd75e9766e36738dbd7a94f160))
+
 ## [0.2.0](https://github.com/errestan/cambridge-audio-azur-851/compare/v0.1.0...v0.2.0) (2026-11-18)
 
 

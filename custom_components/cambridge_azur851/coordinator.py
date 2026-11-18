@@ -10,7 +10,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .azur851 import Azur851Client, Azur851ConnectionError, Azur851Error
@@ -40,6 +41,16 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
         self.client = Azur851Client.from_config(entry.data)
         self.client.on_update = self._handle_push
         self.client.on_connection_state = self._handle_connection_state
+        # Close the link as soon as Home Assistant starts stopping. The ESPHome
+        # serial proxy goes away during shutdown; left open, the link would see
+        # that as an error, log it and try to reconnect.
+        entry.async_on_unload(
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._async_on_stop)
+        )
+
+    async def _async_on_stop(self, event: Event) -> None:
+        """Close the connection when Home Assistant stops."""
+        await self.client.async_close()
 
     @callback
     def _handle_push(self) -> None:

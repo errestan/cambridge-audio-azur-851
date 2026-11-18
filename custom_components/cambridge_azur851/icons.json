@@ -8,6 +8,9 @@
     "select": {
       "speakers": {
         "default": "mdi:speaker-multiple"
+      },
+      "display_brightness": {
+        "default": "mdi:brightness-6"
       }
     },
     "switch": {

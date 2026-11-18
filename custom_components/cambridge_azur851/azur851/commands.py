@@ -74,6 +74,14 @@ class Speakers(IntEnum):
     B = 2
 
 
+class Brightness(IntEnum):
+    """LCD brightness data values."""
+
+    OFF = 0
+    DIM = 1
+    BRIGHT = 2
+
+
 class Error(IntEnum):
     """Group 5 error numbers. 1-6 are hardware faults (851A only)."""
 
@@ -194,6 +202,11 @@ def _level(level: int, low: int, high: int, what: str) -> str:
     if not low <= level <= high:
         raise ValueError(f"{what} out of range ({low}-{high}): {level}")
     return f"{level:02d}"
+
+
+def lcd_brightness(brightness: Brightness) -> Command:
+    """Set the front-panel display brightness: off, dim or bright."""
+    return Command(Group.CONTROL, Control.LCD_BRIGHTNESS, str(int(brightness)))
 
 
 def set_direct(on: bool) -> Command:

@@ -35,6 +35,7 @@ from .conftest import FakeLink, SetupEntry
 
 BALANCE = "number.azur_851a_balance"
 SPEAKERS = "select.azur_851a_speakers"
+BRIGHTNESS = "select.azur_851a_display_brightness"
 DIRECT = "switch.azur_851a_direct"
 TAPE_MONITOR = "switch.azur_851a_tape_monitor"
 
@@ -49,6 +50,8 @@ TAPE_MONITOR = "switch.azur_851a_tape_monitor"
         (SPEAKERS, b"#4,21,0\r", "a"),
         (SPEAKERS, b"#4,21,1\r", "ab"),
         (SPEAKERS, b"#4,21,2\r", "b"),
+        (BRIGHTNESS, b"#4,20,0\r", "off"),
+        (BRIGHTNESS, b"#4,20,2\r", "bright"),
         (DIRECT, b"#4,26,1\r", "on"),
         (DIRECT, b"#4,26,0\r", "off"),
         (TAPE_MONITOR, b"#4,08,1\r", "on"),
@@ -88,6 +91,13 @@ async def test_update_sets_state(
             {ATTR_OPTION: "b"},
             b"#1,21,2\r",
         ),
+        (
+            SELECT_DOMAIN,
+            SERVICE_SELECT_OPTION,
+            BRIGHTNESS,
+            {ATTR_OPTION: "dim"},
+            b"#1,20,1\r",
+        ),
         (SWITCH_DOMAIN, SERVICE_TURN_ON, DIRECT, {}, b"#1,26,1\r"),
         (SWITCH_DOMAIN, SERVICE_TURN_OFF, TAPE_MONITOR, {}, b"#1,08,0\r"),
     ],
@@ -119,6 +129,7 @@ async def test_851e_has_only_its_settings(
     entity_ids = set(hass.states.async_entity_ids(["number", "select", "switch"]))
     assert entity_ids == {
         "number.azur_851e_balance",
+        "select.azur_851e_display_brightness",
         "switch.azur_851e_direct",
         "switch.azur_851e_record_in",
     }

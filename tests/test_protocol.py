@@ -83,6 +83,7 @@ def test_setting_encoding() -> None:
     assert encode(commands.speaker_select(commands.Speakers.AB)) == b"#1,21,1\r"
     assert encode(commands.tape_monitor(True)) == b"#1,08,1\r"
     assert encode(commands.set_direct(False)) == b"#1,26,0\r"
+    assert encode(commands.lcd_brightness(commands.Brightness.DIM)) == b"#1,20,1\r"
     with pytest.raises(ValueError):
         commands.set_balance(17)
     with pytest.raises(ValueError):

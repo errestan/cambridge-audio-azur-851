@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
 
 from .conftest import FakeLink, SetupEntry
@@ -83,3 +84,36 @@ async def test_error_reply_is_logged(
     await hass.async_block_till_done()
 
     assert message in caplog.text
+
+
+async def test_link_loss_is_logged(
+    hass: HomeAssistant,
+    fake_link: FakeLink,
+    setup_entry: SetupEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """While running, losing the link is reported (and the entity goes down)."""
+    await setup_entry()
+
+    fake_link.readers[-1].feed_eof()
+    await hass.async_block_till_done()
+
+    assert "Connection to Azur 851 lost" in caplog.text
+
+
+async def test_stop_closes_link_quietly(
+    hass: HomeAssistant,
+    fake_link: FakeLink,
+    setup_entry: SetupEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """On shutdown the link is closed first, so the proxy going away is silent."""
+    entry = await setup_entry()
+
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+    fake_link.readers[-1].feed_eof()  # the ESPHome proxy disappears
+    await hass.async_block_till_done()
+
+    assert not entry.runtime_data.client.is_open
+    assert "Connection to Azur 851 lost" not in caplog.text

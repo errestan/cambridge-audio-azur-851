@@ -37,6 +37,8 @@ class DeviceState:
     balance: int | None = None  # 0 (left) .. 8 (centre) .. 16 (right)
     speakers: int | None = None  # commands.Speakers value
     direct: bool | None = None
+    # Reported by the amp on every power-on, so it is known soon after connect.
+    brightness: int | None = None  # commands.Brightness value
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,7 @@ class ModelCapabilities:
     has_source_select: bool = True
     has_balance: bool = True
     has_direct: bool = True
+    has_display_brightness: bool = True
     has_speaker_select: bool = False
     # Control #08: "tape_monitor" on the 851A, "record_in" on the 851E, or None.
     monitor: str | None = "tape_monitor"

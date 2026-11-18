@@ -61,6 +61,7 @@ unsolicited, the connection runs a background read loop and the integration is
 | Media player | ✓ | ✓ | Power, volume, mute, source. Inputs with both XLR and RCA sockets are listed twice, e.g. "Input 1" and "Input 1 (Balanced)". |
 | Balance (number) | ✓ | ✓ | −8 (left) … +8 (right), 0 is centre |
 | Speakers (select) | ✓ | – | A, A + B, B |
+| Display brightness (select) | ✓ | ✓ | Off, Dim, Bright. The amp reports it at every power-on |
 | Direct (switch) | ✓ | ✓ | |
 | Tape monitor / Record in (switch) | ✓ | ✓ | Named "Record in" on the 851E |
 
@@ -81,7 +82,7 @@ custom_components/cambridge_azur851/
 ├── entity.py            # Base entities (device info, availability, restore)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
 ├── number.py            # Balance
-├── select.py            # Speaker outputs (A / A+B / B)
+├── select.py            # Speaker outputs, display brightness
 ├── switch.py            # Direct, tape monitor / record in
 ├── icons.json           # Entity icons
 ├── strings.json         # UI strings

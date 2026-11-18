@@ -42,6 +42,14 @@
           "ab": "A + B",
           "b": "B"
         }
+      },
+      "display_brightness": {
+        "name": "Display brightness",
+        "state": {
+          "off": "Off",
+          "dim": "Dim",
+          "bright": "Bright"
+        }
       }
     },
     "switch": {

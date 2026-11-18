@@ -130,8 +130,10 @@ over-temperature · `04` clipping · `05` mains fail · `06` speaker fail.
   with explicit data (`0`/`1`), never with no data, which would silently pick
   the unbalanced socket (851A) or toggle it (851E). Updates report the socket
   as `#4,01,1` (balanced) or `#4,01,` (unbalanced).
-- **Settings are push-only too.** Balance, speakers, Direct and tape monitor
-  are learned from their `#4` updates. Until one arrives, the
+- **Settings are push-only too.** Balance, speakers, display brightness,
+  Direct and tape monitor are learned from their `#4` updates. On power-on a
+  real 851A sends `#4,20` (brightness) and `#4,21` (speakers) unprompted, so
+  those two become known whenever the amp is switched on. Until one arrives, the
   entity shows its pre-restart value as an assumed state (`RestoreEntity`).
   Balance is shown centred on zero (device value − 8).
 - **Bass/treble (#24/#25) don't work on a real 851A.** It answers both with

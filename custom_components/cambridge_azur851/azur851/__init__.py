@@ -23,6 +23,7 @@ from .commands import (
     ERROR_DESCRIPTIONS,
     INPUT_MAX,
     INPUT_MIN,
+    Brightness,
     Control,
     Group,
     Speakers,
@@ -44,6 +45,7 @@ _LOGGER = logging.getLogger(__name__)
 _LEVEL_UPDATES: dict[int, str] = {
     Control.SET_BALANCE: "balance",
     Control.SPEAKER_SELECT: "speakers",
+    Control.LCD_BRIGHTNESS: "brightness",
 }
 _SWITCH_UPDATES: dict[int, str] = {
     Control.TAPE_MONITOR: "tape_monitor",
@@ -180,6 +182,10 @@ class Azur851Client:
         """Turn tape monitor (851E: record in) on or off."""
         await self._write(commands.tape_monitor(on))
 
+    async def async_set_brightness(self, brightness: Brightness) -> None:
+        """Set the display brightness."""
+        await self._write(commands.lcd_brightness(brightness))
+
     async def async_set_direct(self, on: bool) -> None:
         """Turn Direct mode on or off."""
         await self._write(commands.set_direct(on))
@@ -286,6 +292,7 @@ __all__ = [
     "Azur851Error",
     "Azur851NoResponseError",
     "Azur851ProtocolError",
+    "Brightness",
     "DeviceState",
     "ModelCapabilities",
     "Speakers",

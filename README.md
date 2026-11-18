@@ -6,6 +6,10 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![License: MIT](https://img.shields.io/github/license/errestan/cambridge-audio-azur-851)](LICENSE)
 
+<p align="center">
+  <img src="docs/images/banner.png" alt="A silver Cambridge Audio Azur 851A amplifier connected by a cable to a phone showing volume and power controls, titled Cambridge Audio Azur 851 for Home Assistant" width="720">
+</p>
+
 A custom [Home Assistant](https://www.home-assistant.io/) integration for controlling
 **Cambridge Audio Azur 851 series** audio equipment over RS-232 serial.
 
@@ -85,6 +89,7 @@ custom_components/cambridge_azur851/
 ├── select.py            # Speaker outputs, display brightness
 ├── switch.py            # Direct, tape monitor / record in
 ├── icons.json           # Entity icons
+├── brand/               # Integration icon and logo (light + dark), shown in HA
 ├── strings.json         # UI strings
 ├── translations/
 │   └── en.json

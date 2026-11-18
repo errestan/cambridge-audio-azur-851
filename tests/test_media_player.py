@@ -110,6 +110,25 @@ async def test_851e_source_list_has_balanced_input_3(
     assert "Input 4 (Balanced)" not in state.attributes["source_list"]
 
 
+@pytest.mark.parametrize("case", [(b"#4,11,1\r", "on"), (b"#4,11,0\r", "off")])
+async def test_power_state(
+    hass: HomeAssistant,
+    fake_link: FakeLink,
+    setup_entry: SetupEntry,
+    case: tuple[bytes, str],
+) -> None:
+    """Power updates map to on / off (standby is reported as off)."""
+    frame, expected = case
+    await setup_entry()
+
+    fake_link.readers[-1].feed_data(frame)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state is not None
+    assert state.state == expected
+
+
 async def test_command_on_dropped_link_raises_ha_error(
     hass: HomeAssistant, setup_entry: SetupEntry
 ) -> None:

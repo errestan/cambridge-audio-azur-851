@@ -52,7 +52,8 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
         power_on = self.coordinator.data.power_on
         if power_on is None:
             return None
-        return MediaPlayerState.ON if power_on else MediaPlayerState.STANDBY
+        # Standby is reported as OFF: MediaPlayerState.STANDBY is deprecated.
+        return MediaPlayerState.ON if power_on else MediaPlayerState.OFF
 
     @property
     def volume_level(self) -> float | None:

@@ -58,3 +58,28 @@ async def test_unload(hass: HomeAssistant, setup_entry: SetupEntry) -> None:
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        (b"#5,08,\r", "Azur 851A rejected #1,26,1: unknown command number"),
+        (b"#5,03,\r", "Azur 851A reported a fault: over temperature"),
+    ],
+)
+async def test_error_reply_is_logged(
+    hass: HomeAssistant,
+    fake_link: FakeLink,
+    setup_entry: SetupEntry,
+    caplog: pytest.LogCaptureFixture,
+    case: tuple[bytes, str],
+) -> None:
+    """Group-5 replies are logged, naming the command that was rejected."""
+    frame, message = case
+    entry = await setup_entry()
+    await entry.runtime_data.client.async_set_direct(True)
+
+    fake_link.readers[-1].feed_data(frame)
+    await hass.async_block_till_done()
+
+    assert message in caplog.text

@@ -13,10 +13,11 @@
 A custom [Home Assistant](https://www.home-assistant.io/) integration for controlling
 **Cambridge Audio Azur 851 series** audio equipment over RS-232 serial.
 
-> **Status:** early but functional. The RS-232 protocol, the `serialx` transport
-> (local / `socket://` / ESPHome proxy) with auto-reconnect, the `media_player`
-> entity, and the config/reconfigure flows are implemented and unit-tested. Not
-> yet validated against real hardware. See [Roadmap](#roadmap).
+> **Status:** working. Tested on a real Azur 851A connected through a Home
+> Assistant Connect AUX-2 (ESPHome serial proxy): power, volume, mute, sources,
+> balance, speakers, Direct, tape monitor and display brightness all work in
+> both directions. The 851E is implemented from its protocol document but not
+> yet tested on hardware. See [Roadmap](#roadmap).
 
 ## Supported hardware
 
@@ -172,7 +173,9 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next imp
 - [x] Reconfigure flow to change the serial port / model later
 - [x] Tests: config flow, reconfigure, setup/coordinator/entity
 - [x] CI: GitHub Actions (pre-commit lint/type, pytest, hassfest, HACS validation)
-- [ ] Validate against real hardware
+- [x] Validate against real hardware (851A over a Home Assistant Connect AUX-2)
+- [x] Settings entities: balance, speakers, Direct, tape monitor, display brightness
+- [ ] Validate the 851E on real hardware
 
 ## License
 

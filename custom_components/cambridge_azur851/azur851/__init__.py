@@ -13,11 +13,20 @@ the optional ``on_update`` callback so the coordinator can push to Home Assistan
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from typing import Any, Self
 
 from . import commands
-from .commands import INPUT_MAX, INPUT_MIN, Control, Group, Speakers
+from .commands import (
+    COMMAND_ERRORS,
+    ERROR_DESCRIPTIONS,
+    INPUT_MAX,
+    INPUT_MIN,
+    Control,
+    Group,
+    Speakers,
+)
 from .connection import Azur851Connection
 from .exceptions import (
     Azur851CommandError,
@@ -28,6 +37,8 @@ from .exceptions import (
 )
 from .models import DeviceState, ModelCapabilities, get_model_capabilities
 from .protocol import Command, Response, decode, encode
+
+_LOGGER = logging.getLogger(__name__)
 
 # Group-4 updates that carry a setting, mapped to the DeviceState field they set.
 _LEVEL_UPDATES: dict[int, str] = {
@@ -65,6 +76,8 @@ class Azur851Client:
         self.on_connection_state: Callable[[bool], None] | None = None
         # Resolved by the next valid inbound frame while a probe is in flight.
         self._probe_waiter: asyncio.Future[Response] | None = None
+        # The last command sent, so a group-5 reply can say what it rejected.
+        self._last_sent: Command | None = None
 
     @classmethod
     def from_config(cls, data: dict[str, Any]) -> Self:
@@ -201,6 +214,7 @@ class Azur851Client:
 
     async def _write(self, command: Command) -> None:
         """Encode and send a command. The device answers via the read loop."""
+        self._last_sent = command
         await self._connection.async_write(encode(command))
 
     def _forward_connection_state(self, connected: bool) -> None:
@@ -217,9 +231,20 @@ class Azur851Client:
         if self._probe_waiter is not None and not self._probe_waiter.done():
             self._probe_waiter.set_result(response)
         if response.is_error:
-            return  # group-5 errors are not state; could be logged/raised later
+            self._log_error(response)
+            return
         if self.apply_update(response) and self.on_update is not None:
             self.on_update()
+
+    def _log_error(self, response: Response) -> None:
+        """Log a group-5 error: a rejected command or a hardware fault."""
+        what = ERROR_DESCRIPTIONS.get(response.number, f"error {response.number}")
+        if response.number in COMMAND_ERRORS:
+            sent = self._last_sent
+            rejected = encode(sent).decode().strip() if sent else "a command"
+            _LOGGER.warning("Azur %s rejected %s: %s", self._model, rejected, what)
+        else:
+            _LOGGER.warning("Azur %s reported a fault: %s", self._model, what)
 
     def apply_update(self, response: Response) -> bool:
         """Fold a group-4 update/reply frame into state; return True if changed."""

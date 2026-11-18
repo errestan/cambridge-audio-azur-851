@@ -74,6 +74,38 @@ class Speakers(IntEnum):
     B = 2
 
 
+class Error(IntEnum):
+    """Group 5 error numbers. 1-6 are hardware faults (851A only)."""
+
+    OVERLOAD = 1
+    DC_OFFSET = 2
+    OVER_TEMPERATURE = 3
+    CLIPPING = 4
+    MAINS_FAIL = 5
+    SPEAKER_FAIL = 6
+    UNKNOWN_GROUP = 7
+    UNKNOWN_NUMBER = 8
+    DATA_ERROR = 9
+
+
+ERROR_DESCRIPTIONS: dict[int, str] = {
+    Error.OVERLOAD: "overload",
+    Error.DC_OFFSET: "DC offset",
+    Error.OVER_TEMPERATURE: "over temperature",
+    Error.CLIPPING: "clipping",
+    Error.MAINS_FAIL: "mains fail",
+    Error.SPEAKER_FAIL: "speaker fail",
+    Error.UNKNOWN_GROUP: "unknown command group",
+    Error.UNKNOWN_NUMBER: "unknown command number",
+    Error.DATA_ERROR: "invalid command data",
+}
+
+# Errors that are a reply to the last command, rather than a hardware fault.
+COMMAND_ERRORS: frozenset[int] = frozenset(
+    {Error.UNKNOWN_GROUP, Error.UNKNOWN_NUMBER, Error.DATA_ERROR}
+)
+
+
 class Setup(IntEnum):
     """Group 2 setup command numbers."""
 

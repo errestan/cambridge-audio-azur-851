@@ -135,6 +135,7 @@ class Azur851Connection:
             except (serialx.SerialException, OSError, asyncio.LimitOverrunError) as err:
                 _LOGGER.debug("Serial read loop stopped: %s", err)
                 break
+            _LOGGER.debug("rx %r", frame)
             if self.on_frame is not None:
                 self.on_frame(frame)
         self._handle_disconnect()
@@ -172,6 +173,7 @@ class Azur851Connection:
         if self._writer is None:
             raise Azur851ConnectionError("Connection is not open")
         async with self._lock:
+            _LOGGER.debug("tx %r", frame)
             try:
                 self._writer.write(frame)
                 await self._writer.drain()

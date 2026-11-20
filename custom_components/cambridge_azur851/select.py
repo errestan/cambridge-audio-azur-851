@@ -1,4 +1,4 @@
-"""Select platform: speaker outputs and display brightness."""
+"""Select platform: speaker outputs, display brightness and the 851D filter."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .azur851 import Azur851Client, Brightness, Speakers
+from .azur851 import Azur851Client, Brightness, Filter, Speakers
 from .entity import Azur851SettingDescription, Azur851SettingEntity
 
 if TYPE_CHECKING:
@@ -53,6 +53,20 @@ SELECTS: tuple[Azur851SelectDescription, ...] = (
         value_fn=lambda state: state.brightness,
         exists_fn=lambda caps: caps.has_display_brightness,
         set_fn=lambda client, value: client.async_set_brightness(Brightness(value)),
+    ),
+    Azur851SelectDescription(
+        key="filter",
+        translation_key="filter",
+        entity_category=EntityCategory.CONFIG,
+        values={
+            "linear": Filter.LINEAR,
+            "minimum": Filter.MINIMUM,
+            "steep": Filter.STEEP,
+        },
+        options=["linear", "minimum", "steep"],
+        value_fn=lambda state: state.filter,
+        exists_fn=lambda caps: caps.has_filter,
+        set_fn=lambda client, value: client.async_set_filter(Filter(value)),
     ),
 )
 

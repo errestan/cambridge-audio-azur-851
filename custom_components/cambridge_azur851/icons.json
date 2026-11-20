@@ -11,6 +11,9 @@
       },
       "display_brightness": {
         "default": "mdi:brightness-6"
+      },
+      "filter": {
+        "default": "mdi:sine-wave"
       }
     },
     "switch": {
@@ -22,6 +25,9 @@
       },
       "record_in": {
         "default": "mdi:record-rec"
+      },
+      "phase_inverted": {
+        "default": "mdi:swap-vertical"
       }
     }
   }

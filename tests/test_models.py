@@ -26,8 +26,8 @@ async def test_unsupported_model_entry_warns(
     monkeypatch.setattr(serialx, "open_serial_connection", _unreachable)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Azur 851D",
-        data={CONF_MODEL: "851D", CONF_SERIAL_URL: "/dev/ttyUSB0"},
+        title="Azur 851C",
+        data={CONF_MODEL: "851C", CONF_SERIAL_URL: "/dev/ttyUSB0"},
     )
     entry.add_to_hass(hass)
 
@@ -35,4 +35,4 @@ async def test_unsupported_model_entry_warns(
     await hass.async_block_till_done()
 
     # Logged before connecting, so the (unreachable) port does not matter.
-    assert "Azur 851D is not a supported model" in caplog.text
+    assert "Azur 851C is not a supported model" in caplog.text

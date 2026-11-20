@@ -16,8 +16,10 @@ A custom [Home Assistant](https://www.home-assistant.io/) integration for contro
 > **Status:** working. Tested on a real Azur 851A connected through a Home
 > Assistant Connect AUX-2 (ESPHome serial proxy): power, volume, mute, sources,
 > balance, speakers, Direct, tape monitor and display brightness all work in
-> both directions. The 851E is implemented from its protocol document but not
-> yet tested on hardware. See [Roadmap](#roadmap).
+> both directions. An 851D on the AUX-2's second port works the same way
+> (power, mute, sources, balance, display brightness, filter and phase; volume
+> untested, as its pre-amp mode was off). The 851E is implemented from its
+> protocol document but not yet tested on hardware. See [Roadmap](#roadmap).
 
 ## Supported hardware
 
@@ -28,7 +30,7 @@ A custom [Home Assistant](https://www.home-assistant.io/) integration for contro
 | 851W   | Power amplifier      | Planned — separate command set, not implemented |
 | 851N   | Network player       | Planned — separate command set, not implemented |
 | 851C   | CD player            | Planned — separate command set, not implemented |
-| 851D   | DAC / preamplifier   | Planned — separate command set, not implemented |
+| 851D   | DAC / preamplifier   | **Supported** — its own command set, from the 851D protocol V1.0 (9600 baud) |
 
 Only supported models can be chosen during setup. Entries created for other
 models by earlier versions keep loading, but are driven with the 851A command
@@ -61,19 +63,22 @@ unsolicited, the connection runs a background read loop and the integration is
 
 ## Entities
 
-| Entity | 851A | 851E | Notes |
-|--------|:----:|:----:|-------|
-| Media player | ✓ | ✓ | Power, volume, mute, source. Inputs with both XLR and RCA sockets are listed twice, e.g. "Input 1" and "Input 1 (Balanced)". |
-| Balance (number) | ✓ | ✓ | −8 (left) … +8 (right), 0 is centre |
-| Speakers (select) | ✓ | – | A, A + B, B |
-| Display brightness (select) | ✓ | ✓ | Off, Dim, Bright. The amp reports it at every power-on |
-| Direct (switch) | ✓ | ✓ | |
-| Tape monitor / Record in (switch) | ✓ | ✓ | Named "Record in" on the 851E |
+| Entity | 851A | 851E | 851D | Notes |
+|--------|:----:|:----:|:----:|-------|
+| Media player | ✓ | ✓ | ✓ | Power, volume, mute, source. Amp inputs with both XLR and RCA sockets are listed twice, e.g. "Input 1" and "Input 1 (Balanced)". |
+| Balance (number) | ✓ | ✓ | ✓ | −8 (left) … +8 (right), 0 is centre |
+| Speakers (select) | ✓ | – | – | A, A + B, B |
+| Display brightness (select) | ✓ | ✓ | ✓ | Off, Dim, Bright. The 851A reports it at every power-on |
+| Direct (switch) | ✓ | ✓ | – | |
+| Tape monitor / Record in (switch) | ✓ | ✓ | – | Named "Record in" on the 851E |
+| Filter (select) | – | – | ✓ | Linear phase, Minimum phase, Steep. The 851D remembers one per input |
+| Invert phase (switch) | – | – | ✓ | |
 
-The amp has no way to read a setting back; it reports each one only when it
+The amps have no way to read a setting back; they report each one only when it
 changes (from Home Assistant, the remote or the front panel). Until it does,
 these entities show the value they had before Home Assistant restarted, marked
-as an *assumed state*.
+as an *assumed state*. The 851D can be asked for its volume and filter, so those
+are read as soon as it connects.
 
 ## Architecture
 
@@ -87,8 +92,8 @@ custom_components/cambridge_azur851/
 ├── entity.py            # Base entities (device info, availability, restore)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
 ├── number.py            # Balance
-├── select.py            # Speaker outputs, display brightness
-├── switch.py            # Direct, tape monitor / record in
+├── select.py            # Speaker outputs, display brightness, 851D filter
+├── switch.py            # Direct, tape monitor / record in, 851D phase
 ├── icons.json           # Entity icons
 ├── brand/               # Integration icon and logo (light + dark), shown in HA
 ├── strings.json         # UI strings
@@ -98,7 +103,9 @@ custom_components/cambridge_azur851/
     ├── __init__.py      # Public client API
     ├── connection.py    # serialx transport: read loop, auto-reconnect
     ├── protocol.py      # Frame encode/decode for the Azur RS-232 protocol
-    ├── commands.py      # Command & response definitions (command groups)
+    ├── commands.py      # 851A/851E command definitions (command groups)
+    ├── commands_851d.py # 851D command definitions
+    ├── command_sets.py  # Per-model command set: build commands, read replies
     ├── models.py        # Per-model capability maps + device state
     └── exceptions.py    # Library exception types
 ```
@@ -175,6 +182,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next imp
 - [x] CI: GitHub Actions (pre-commit lint/type, pytest, hassfest, HACS validation)
 - [x] Validate against real hardware (851A over a Home Assistant Connect AUX-2)
 - [x] Settings entities: balance, speakers, Direct, tape monitor, display brightness
+- [x] 851D support (its own command set; filter and phase entities)
+- [x] Validate the 851D on real hardware (all but volume, pre-amp mode was off)
 - [ ] Validate the 851E on real hardware
 
 ## License

@@ -6,13 +6,16 @@ official Serial Control Protocol documents:
   - 851A: 9600 baud, volume 00-96, has speaker select.
   - 851E: 115200 baud (default; also 38400/9600), volume 00-91, no speaker
     select; its #08 is called "Record in" rather than "Tape monitor".
+  - 851D: 9600 baud, a different command set altogether (``commands_851d.py``):
+    volume is attenuation 000-096 dB, eight digital sources, and a selectable
+    digital filter. No Direct, tape monitor or speaker select.
 
 The 851A document also lists bass/treble (#24/#25), but a real 851A rejects
 them as unknown commands, so they are not offered.
 
-The 851W (power amp), 851N (network player), 851C (CD player) and 851D (DAC)
-have separate command sets that are not implemented; any model without an entry
-here gets the generic (851A-like) profile from ``get_model_capabilities``.
+The 851W (power amp), 851N (network player) and 851C (CD player) have separate
+command sets that are not implemented; any model without an entry here gets the
+generic (851A-like) profile from ``get_model_capabilities``.
 """
 
 from __future__ import annotations
@@ -39,6 +42,9 @@ class DeviceState:
     direct: bool | None = None
     # Reported by the amp on every power-on, so it is known soon after connect.
     brightness: int | None = None  # commands.Brightness value
+    # 851D only; it can be read back, so it is known soon after connect.
+    filter: int | None = None  # commands_851d.Filter value
+    phase_inverted: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +65,8 @@ class ModelCapabilities:
     """Describes what a given model supports."""
 
     model: str
+    # Which command set drives it: "amp" (851A/851E) or "dac" (851D).
+    command_set: str = "amp"
     baudrate: int = 9600
     has_volume: bool = True
     has_mute: bool = True
@@ -67,6 +75,7 @@ class ModelCapabilities:
     has_direct: bool = True
     has_display_brightness: bool = True
     has_speaker_select: bool = False
+    has_filter: bool = False
     # Control #08: "tape_monitor" on the 851A, "record_in" on the 851E, or None.
     monitor: str | None = "tape_monitor"
     # Map of source name -> input (control command number + socket).
@@ -74,6 +83,8 @@ class ModelCapabilities:
     # Device-native volume range, used to scale to/from Home Assistant's 0..1.
     volume_min: int = 0
     volume_max: int = 96
+    # True when the device level is attenuation (0 = loudest), as on the 851D.
+    volume_inverted: bool = False
 
     def source_name(self, code: int | None, balanced: bool = False) -> str | None:
         """Resolve a device input number (and socket) back to its name."""
@@ -111,6 +122,32 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
         sources=_inputs(balanced=(1, 2, 3)),
         volume_max=91,
         monitor="record_in",
+    ),
+    "851D": ModelCapabilities(
+        model="851D",
+        command_set="dac",
+        baudrate=9600,
+        sources={
+            name: Source(number)
+            for number, name in enumerate(
+                (
+                    "Input 1",
+                    "Input 2",
+                    "Input 3",
+                    "Input 4",
+                    "BNC",
+                    "AES/EBU",
+                    "Bluetooth",
+                    "USB",
+                ),
+                start=1,
+            )
+        },
+        volume_max=96,
+        volume_inverted=True,
+        has_direct=False,
+        has_filter=True,
+        monitor=None,
     ),
 }
 

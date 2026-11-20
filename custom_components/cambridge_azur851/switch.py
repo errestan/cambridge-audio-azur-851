@@ -1,4 +1,4 @@
-"""Switch platform: Direct mode and tape monitor (851E: record in)."""
+"""Switch platform: Direct, tape monitor (851E: record in), 851D phase invert."""
 
 from __future__ import annotations
 
@@ -51,6 +51,14 @@ SWITCHES: tuple[Azur851SwitchDescription, ...] = (
         value_fn=lambda state: state.tape_monitor,
         exists_fn=lambda caps: caps.monitor == "record_in",
         set_fn=lambda client, on: client.async_set_tape_monitor(on),
+    ),
+    Azur851SwitchDescription(
+        key="phase_inverted",
+        translation_key="phase_inverted",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda state: state.phase_inverted,
+        exists_fn=lambda caps: caps.has_filter,
+        set_fn=lambda client, on: client.async_set_phase_inverted(on),
     ),
 )
 

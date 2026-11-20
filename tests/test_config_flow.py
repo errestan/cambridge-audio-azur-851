@@ -42,7 +42,7 @@ async def test_user_form_offers_supported_models_only(hass: HomeAssistant) -> No
     model_selector = result["data_schema"].schema[CONF_MODEL]
     options = [opt["value"] for opt in model_selector.config["options"]]
 
-    assert options == ["851A", "851E"]
+    assert options == ["851A", "851E", "851D"]
 
 
 async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:

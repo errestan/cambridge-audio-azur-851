@@ -76,7 +76,8 @@ def decode(frame: bytes | str) -> Response:
     there is no data) and preserves commas inside the data field.
     """
     text = frame.decode(ENCODING) if isinstance(frame, bytes | bytearray) else frame
-    text = text.strip("\r\n")
+    # A real 851D sometimes sends a NUL before a frame; drop line noise.
+    text = text.strip("\r\n\x00")
 
     if not text.startswith(HEADER):
         raise Azur851ProtocolError(f"Frame missing '{HEADER}' header: {text!r}")

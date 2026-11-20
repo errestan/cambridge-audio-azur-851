@@ -16,7 +16,7 @@ CONF_MODEL: Final = "model"
 CONF_SERIAL_URL: Final = "serial_url"
 
 # --- Defaults --------------------------------------------------------------
-# Baud is model-dependent (851A=9600, 851E=115200, ...); the authoritative
+# Baud is model-dependent (851A/851D=9600, 851E=115200); the authoritative
 # per-model values live in azur851/models.py. This is only a fallback for
 # unknown models. All models use 8 data bits, no parity, 1 stop bit, no
 # handshake.
@@ -24,9 +24,10 @@ DEFAULT_BAUDRATE: Final = 9600
 
 # --- Supported models ------------------------------------------------------
 # Only models whose command map has been checked against Cambridge Audio's
-# official serial protocol documents are offered during setup. The 851W/N/C/D
+# official serial protocol documents are offered during setup. The 851W/N/C
 # use separate command sets that are not implemented yet (see docs/protocol.md).
 MODEL_851A: Final = "851A"
 MODEL_851E: Final = "851E"
+MODEL_851D: Final = "851D"
 
-SUPPORTED_MODELS: Final = [MODEL_851A, MODEL_851E]
+SUPPORTED_MODELS: Final = [MODEL_851A, MODEL_851E, MODEL_851D]

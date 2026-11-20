@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Cambridge Audio Azur 851",
-        "description": "Choose the model and the serial port the amplifier is connected to. ESPHome serial proxies (e.g. a Home Assistant Connect AUX-2) appear in the list once the ESPHome device is set up in Home Assistant.",
+        "description": "Choose the model and the serial port the device is connected to. ESPHome serial proxies (e.g. a Home Assistant Connect AUX-2) appear in the list once the ESPHome device is set up in Home Assistant.",
         "data": {
           "model": "Model",
           "serial_url": "Serial port"
@@ -20,7 +20,7 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to the device.",
-      "no_response": "The serial port opened, but the amplifier did not respond. Check it is connected to this port, the cable/wiring (TX/RX), and that the correct model is selected.",
+      "no_response": "The serial port opened, but the device did not respond. Check it is connected to this port, the cable/wiring (TX/RX), and that the correct model is selected.",
       "unknown": "Unexpected error."
     },
     "abort": {
@@ -50,6 +50,14 @@
           "dim": "Dim",
           "bright": "Bright"
         }
+      },
+      "filter": {
+        "name": "Filter",
+        "state": {
+          "linear": "Linear phase",
+          "minimum": "Minimum phase",
+          "steep": "Steep"
+        }
       }
     },
     "switch": {
@@ -61,6 +69,9 @@
       },
       "record_in": {
         "name": "Record in"
+      },
+      "phase_inverted": {
+        "name": "Invert phase"
       }
     }
   }

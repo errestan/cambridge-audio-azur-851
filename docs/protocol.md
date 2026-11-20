@@ -9,6 +9,9 @@ from the official documents and used to implement `custom_components/cambridge_a
   <https://www.cambridgeaudio.com/sites/default/files/compliance/doc/Azur%20851A%20Serial%20Protocol%20V1.0.pdf>
 - **851E Serial Control Protocol V2.0** (PDF):
   <https://www.cambridgeaudio.com/sites/default/files/compliance/doc/Azur%20851E%20RS232%20Protocol.pdf>
+- **851D Serial Control Protocol v1.0** (PDF, 2014; on Cambridge's support
+  archive, which sits behind a browser check):
+  <https://supportarchive.cambridgeaudio.com/hc/en-us/article_attachments/360000079398>
 - Per-model RS232 code pages (support portal):
   [851A](https://techsupport.cambridgeaudio.com/hc/en-us/articles/200945322-Azur-851A-RS232-Codes) ·
   [851C](https://techsupport.cambridgeaudio.com/hc/en-us/articles/201716511-Azur-851C-RS232-Codes) ·
@@ -26,7 +29,8 @@ bit, no handshake. Baud rate is **model-dependent**:
 |-------|------|--------------|-------|
 | 851A  | 9600 | `00`–`96` | Has speaker select, bass, treble, A-BUS |
 | 851E  | 115200 (default; also 38400 / 9600) | `00`–`91` | Pre-amp; no tone controls |
-| 851W / 851N / 851C / 851D | TBD | TBD | Separate command sets — consult their code pages |
+| 851D  | 9600 | `000`–`096` attenuation (`000` = 0 dB, loudest) | DAC / preamp; its own command set — see [851D](#851d--a-separate-command-set) |
+| 851W / 851N / 851C | TBD | TBD | Separate command sets — consult their code pages |
 
 ## Frame format
 
@@ -113,6 +117,57 @@ the front panel or remote), not only in response to our commands.
 `07` unknown command group · `08` unknown command number · `09` data error.
 851A also reports hardware faults: `01` overload · `02` DC offset · `03`
 over-temperature · `04` clipping · `05` mains fail · `06` speaker fail.
+
+## 851D — a separate command set
+
+The 851D shares the frame format but little else. Implemented in
+`azur851/commands_851d.py` and `DacCommandSet` in `azur851/command_sets.py`.
+
+- **Groups:** 1 control, 2 setup, **3 control replies**, **4 setup replies**,
+  5 errors. (The amps reply to control commands on group 4.)
+- **Errors:** `01` unknown group · `02` unknown command number · `03` data
+  error. (The document's table says `04`, its example `#5,03`.)
+
+| # | Command | Data | Reply |
+|---|---------|------|-------|
+| 01 | Select source | `1`–`8` | `#3,01,x` |
+| 02 / 03 | Next / previous source | – | `#3,01,x` |
+| 04 / 05 | Get input word width / sample rate | – | `#3,04,xx` / `#3,05,xx` |
+| 12 | Get volume | – | `#3,12,xxx` |
+| 13 | Set volume | `000`–`096` | `#3,13,xxx` |
+| 14 | Power | `0` standby / `1` on | `#3,14,x` |
+| 15 | LCD brightness | `0` off / `1` dim / `2` bright | `#3,15,x` |
+| 22 | Headphones (reply only) | `0` out / `1` in | `#3,22,x` |
+| 40 | Select filter | `x[,y]`: `1` linear / `2` minimum / `3` steep; `y` `0` normal / `1` inverted phase (omit to keep) | `#3,41,x,y` |
+| 41 | Get filter | – | `#3,41,x,y` |
+| 42 / 43 | Volume up / down | – | `#3,42,xxx` / `#3,43,xxx` |
+| 44 / 45 | Mute / unmute | – | `#3,44,` / `#3,45,` |
+| 46 | Set balance | `00`–`16` | `#3,46,xx` |
+| 47 / 48 | Balance right / left | – | `#3,47,xx` / `#3,48,xx` |
+| 49 | Trigger out | `0` low / `1` high | `#3,49,x` |
+| 50 / 52 / 53 | Get headphone volume / up / down | – | `#3,5x,xxx` |
+
+Setup (group 2, replies on group 4): `01` software version, `02` DSP version,
+`04` set source name (`x,name`, 8 chars), `05` get source name.
+
+Sources: 1–4 Input 1–4, 5 BNC, 6 AES/EBU, 7 Bluetooth, 8 USB.
+
+Unlike the amps, volume and filter **can be read back** (`#1,12,` and
+`#1,41,`), so both are requested on every (re)connect. Power, mute, source,
+balance and brightness have no "get" and are learned from replies as on the
+amps. Setting the phase needs the current filter, since one command carries
+both.
+
+**Real-851D behaviour (tested on hardware):**
+
+- It sends replies **unprompted** when power, source or filter change from the
+  front panel or remote, so it is push-capable like the amps.
+- Filter changes are reported as `#3,40,x,y`, not `#3,41,x,y` as documented.
+  Both are handled.
+- The filter and phase are **remembered per input**: after every source change
+  it reports the new input's filter (`#3,40,x,y`, twice).
+- It sometimes sends a NUL byte before a frame (`\x00#3,14,0`); the decoder
+  strips it.
 
 ## Implementation implications
 

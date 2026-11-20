@@ -4,10 +4,11 @@ This package has NO Home Assistant imports. It can be imported, tested, and used
 independently of Home Assistant. The integration layer wraps it via the
 DataUpdateCoordinator.
 
-State model: the 851 protocol has no "read everything" query -- the device emits
-group-4 update frames when state changes. The connection's read loop feeds those
-frames to :meth:`Azur851Client._handle_frame`, which updates ``state`` and fires
-the optional ``on_update`` callback so the coordinator can push to Home Assistant.
+State model: the 851 protocol has no "read everything" query -- the device
+reports state when it changes (and, on the 851D, a few values on request). The
+connection's read loop feeds those frames to :meth:`Azur851Client._handle_frame`,
+which updates ``state`` through the model's command set and fires the optional
+``on_update`` callback so the coordinator can push to Home Assistant.
 """
 
 from __future__ import annotations
@@ -17,17 +18,10 @@ import logging
 from collections.abc import Callable
 from typing import Any, Self
 
-from . import commands
-from .commands import (
-    COMMAND_ERRORS,
-    ERROR_DESCRIPTIONS,
-    INPUT_MAX,
-    INPUT_MIN,
-    Brightness,
-    Control,
-    Group,
-    Speakers,
-)
+from . import commands, commands_851d
+from .command_sets import CommandSet, get_command_set
+from .commands import Brightness, Speakers
+from .commands_851d import Filter
 from .connection import Azur851Connection
 from .exceptions import (
     Azur851CommandError,
@@ -40,17 +34,6 @@ from .models import DeviceState, ModelCapabilities, get_model_capabilities
 from .protocol import Command, Response, decode, encode
 
 _LOGGER = logging.getLogger(__name__)
-
-# Group-4 updates that carry a setting, mapped to the DeviceState field they set.
-_LEVEL_UPDATES: dict[int, str] = {
-    Control.SET_BALANCE: "balance",
-    Control.SPEAKER_SELECT: "speakers",
-    Control.LCD_BRIGHTNESS: "brightness",
-}
-_SWITCH_UPDATES: dict[int, str] = {
-    Control.TAPE_MONITOR: "tape_monitor",
-    Control.SET_DIRECT: "direct",
-}
 
 # How long to wait for the device to answer a probe. The 851 replies within
 # milliseconds; this leaves headroom for a network serial proxy.
@@ -71,6 +54,7 @@ class Azur851Client:
         self._connection.on_connection_state = self._forward_connection_state
         self._model = model
         self._capabilities = get_model_capabilities(model)
+        self._commands: CommandSet = get_command_set(self._capabilities.command_set)
         self._state = DeviceState()
         # Set by the coordinator to receive push notifications on state change.
         self.on_update: Callable[[], None] | None = None
@@ -126,7 +110,7 @@ class Azur851Client:
             await self._connection.async_close()
 
     async def async_probe(self, response_timeout: float = PROBE_TIMEOUT) -> Response:
-        """Ask for the protocol version and wait for the device to answer.
+        """Send a harmless query and wait for the device to answer.
 
         Any valid frame counts as an answer -- even a group-5 error proves the
         device is there and listening. Returns the first frame received.
@@ -134,7 +118,7 @@ class Azur851Client:
         waiter: asyncio.Future[Response] = asyncio.get_running_loop().create_future()
         self._probe_waiter = waiter
         try:
-            await self._write(commands.get_protocol_version())
+            await self._write(self._commands.probe())
             return await asyncio.wait_for(waiter, response_timeout)
         except TimeoutError as err:
             raise Azur851NoResponseError(
@@ -146,12 +130,11 @@ class Azur851Client:
     async def async_request_state(self) -> None:
         """Ask the device to report whatever state it can without changing it.
 
-        The 851 has no state queries, so only volume can be learned on demand:
-        *Volume stop* is a no-op when no ramp is running, and the device answers
-        it with ``#4,16,<level>``. Power, mute and source are learned only from
-        the unsolicited updates sent when they change.
+        Which values can be read back depends on the model (see the command
+        sets); the rest are learned only from the updates sent when they change.
         """
-        await self._write(commands.volume_stop())
+        for command in self._commands.state_queries():
+            await self._write(command)
 
     async def async_close(self) -> None:
         """Close the underlying transport."""
@@ -161,22 +144,22 @@ class Azur851Client:
 
     async def async_power(self, on: bool) -> None:
         """Set power / standby."""
-        await self._write(commands.power(on))
+        await self._write(self._commands.power(on))
 
     async def async_mute(self, mute: bool) -> None:
         """Mute or unmute."""
-        await self._write(commands.mute(mute))
+        await self._write(self._commands.mute(mute))
 
     async def async_set_volume(self, level: float) -> None:
         """Set volume from a 0..1 fraction, scaled to the device range."""
-        await self._write(commands.set_volume(self._scale_to_device(level)))
+        await self._write(self._commands.set_volume(self._scale_to_device(level)))
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source by its configured name."""
         selected = self._capabilities.sources.get(source)
         if selected is None:
             raise Azur851Error(f"Unknown source for {self._model}: {source!r}")
-        await self._write(commands.select_input(selected.number, selected.balanced))
+        await self._write(self._commands.select_source(selected))
 
     async def async_set_tape_monitor(self, on: bool) -> None:
         """Turn tape monitor (851E: record in) on or off."""
@@ -184,7 +167,7 @@ class Azur851Client:
 
     async def async_set_brightness(self, brightness: Brightness) -> None:
         """Set the display brightness."""
-        await self._write(commands.lcd_brightness(brightness))
+        await self._write(self._commands.lcd_brightness(brightness))
 
     async def async_set_direct(self, on: bool) -> None:
         """Turn Direct mode on or off."""
@@ -192,11 +175,26 @@ class Azur851Client:
 
     async def async_set_balance(self, level: int) -> None:
         """Set balance, device-native 0 (left) .. 8 (centre) .. 16 (right)."""
-        await self._write(commands.set_balance(level))
+        await self._write(self._commands.set_balance(level))
 
     async def async_set_speakers(self, speakers: Speakers) -> None:
         """Select speaker outputs A, A+B or B."""
         await self._write(commands.speaker_select(speakers))
+
+    async def async_set_filter(self, filter_type: Filter) -> None:
+        """Select the digital filter, keeping the phase (851D only)."""
+        await self._write(commands_851d.select_filter(filter_type))
+
+    async def async_set_phase_inverted(self, inverted: bool) -> None:
+        """Invert or restore the output phase (851D only).
+
+        The command sets filter and phase together, so it needs the current
+        filter; that is read back on connect.
+        """
+        filter_type = self._state.filter
+        if filter_type is None:
+            raise Azur851Error("The current filter is not known yet")
+        await self._write(commands_851d.select_filter(Filter(filter_type), inverted))
 
     # --- Volume scaling helpers -------------------------------------------
 
@@ -204,6 +202,8 @@ class Azur851Client:
         """Convert a 0..1 fraction to a device-native volume level."""
         caps = self._capabilities
         fraction = max(0.0, min(1.0, fraction))
+        if caps.volume_inverted:
+            fraction = 1.0 - fraction
         return caps.volume_min + round(fraction * (caps.volume_max - caps.volume_min))
 
     def scale_from_device(self, raw: int | None) -> float | None:
@@ -214,7 +214,8 @@ class Azur851Client:
         span = caps.volume_max - caps.volume_min
         if span <= 0:
             return None
-        return (raw - caps.volume_min) / span
+        fraction = (raw - caps.volume_min) / span
+        return 1.0 - fraction if caps.volume_inverted else fraction
 
     # --- Frame handling ----------------------------------------------------
 
@@ -244,8 +245,9 @@ class Azur851Client:
 
     def _log_error(self, response: Response) -> None:
         """Log a group-5 error: a rejected command or a hardware fault."""
-        what = ERROR_DESCRIPTIONS.get(response.number, f"error {response.number}")
-        if response.number in COMMAND_ERRORS:
+        number = response.number
+        what = self._commands.error_descriptions.get(number, f"error {number}")
+        if number in self._commands.command_errors:
             sent = self._last_sent
             rejected = encode(sent).decode().strip() if sent else "a command"
             _LOGGER.warning("Azur %s rejected %s: %s", self._model, rejected, what)
@@ -253,36 +255,8 @@ class Azur851Client:
             _LOGGER.warning("Azur %s reported a fault: %s", self._model, what)
 
     def apply_update(self, response: Response) -> bool:
-        """Fold a group-4 update/reply frame into state; return True if changed."""
-        if response.group != Group.UPDATE:
-            return False
-        number = response.number
-        if number == Control.POWER:
-            self._state.power_on = response.data == "1"
-        elif number == Control.MUTE:
-            # Update encoding: 1 = mute ON (inverse of the control command).
-            self._state.muted = response.data == "1"
-        elif number in (Control.SET_VOLUME, Control.VOLUME_STOP):
-            self._state.volume_raw = _to_int(response.data)
-        elif INPUT_MIN <= number <= INPUT_MAX:
-            self._state.source_code = number
-            # "1" = balanced socket; no data = unbalanced (or single-socket).
-            self._state.source_balanced = response.data == "1"
-        elif number in _SWITCH_UPDATES:
-            setattr(self._state, _SWITCH_UPDATES[number], response.data == "1")
-        elif number in _LEVEL_UPDATES:
-            setattr(self._state, _LEVEL_UPDATES[number], _to_int(response.data))
-        else:
-            return False
-        return True
-
-
-def _to_int(data: str) -> int | None:
-    """Parse numeric frame data, returning None if it is not an integer."""
-    try:
-        return int(data)
-    except ValueError:
-        return None
+        """Fold a state reply/update into ``state``; return True if changed."""
+        return self._commands.apply(response, self._state)
 
 
 __all__ = [
@@ -294,6 +268,7 @@ __all__ = [
     "Azur851ProtocolError",
     "Brightness",
     "DeviceState",
+    "Filter",
     "ModelCapabilities",
     "Speakers",
 ]

@@ -153,3 +153,58 @@ def get_filter() -> Command:
 def get_dsp_version() -> Command:
     """Ask for the DSP version (group 4 reply); used to probe the link."""
     return Command(SETUP_GROUP, Setup.GET_DSP_VERSION)
+
+
+# Word width codes 01-09 are 16-24 bits; 00 means no valid signal.
+WORD_WIDTHS: dict[int, int] = {code: 15 + code for code in range(1, 10)}
+
+# Sample rate codes, in Hz; 00 means no valid signal.
+SAMPLE_RATES: dict[int, int] = {
+    1: 32000,
+    2: 44100,
+    3: 48000,
+    4: 88200,
+    5: 96000,
+    6: 176400,
+    7: 192000,
+}
+
+
+def set_trigger(high: bool) -> Command:
+    """Set the 12 V trigger output high or low."""
+    return _control(Control.TRIGGER, "1" if high else "0")
+
+
+def get_word_width() -> Command:
+    """Ask for the input's word width (bit depth)."""
+    return _control(Control.GET_WORD_WIDTH)
+
+
+def get_sample_rate() -> Command:
+    """Ask for the input's sampling frequency."""
+    return _control(Control.GET_SAMPLE_RATE)
+
+
+def get_headphone_volume() -> Command:
+    """Ask for the headphone volume."""
+    return _control(Control.GET_HEADPHONE_VOLUME)
+
+
+def headphone_volume_up() -> Command:
+    """Raise the headphone volume one step (headphones must be in)."""
+    return _control(Control.HEADPHONE_VOLUME_UP)
+
+
+def headphone_volume_down() -> Command:
+    """Lower the headphone volume one step (headphones must be in)."""
+    return _control(Control.HEADPHONE_VOLUME_DOWN)
+
+
+def get_software_version() -> Command:
+    """Ask for the software version (group 4 reply)."""
+    return Command(SETUP_GROUP, Setup.GET_SOFTWARE_VERSION)
+
+
+def get_source_name(source: int) -> Command:
+    """Ask for a source's name (group 4 reply ``x,name``)."""
+    return Command(SETUP_GROUP, Setup.GET_SOURCE_NAME, f"{source},")

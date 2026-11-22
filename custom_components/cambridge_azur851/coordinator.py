@@ -8,10 +8,12 @@ once and lets the client push updates in (via ``on_update``) rather than polling
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .azur851 import Azur851Client, Azur851ConnectionError, Azur851Error
@@ -41,6 +43,11 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
         self.client = Azur851Client.from_config(entry.data)
         self.client.on_update = self._handle_push
         self.client.on_connection_state = self._handle_connection_state
+        # Some models have values that are not reported when they change (the
+        # 851D's input sample rate); those are polled. Everything else is push.
+        if (poll := self.client.poll_interval) is not None:
+            self.update_interval = timedelta(seconds=poll)
+        self._sw_version: str | None = None
         # Close the link as soon as Home Assistant starts stopping. The ESPHome
         # serial proxy goes away during shutdown; left open, the link would see
         # that as an error, log it and try to reconnect.
@@ -56,6 +63,25 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
     def _handle_push(self) -> None:
         """Publish freshly pushed device state to listeners."""
         self.async_set_updated_data(self.client.state)
+        self._update_sw_version()
+
+    @callback
+    def _update_sw_version(self) -> None:
+        """Show the versions the device reported on its device page."""
+        state = self.client.state
+        if state.software_version is None:
+            return
+        version = state.software_version
+        if state.dsp_version is not None:
+            version += f" (DSP {state.dsp_version})"
+        if version == self._sw_version:
+            return
+        self._sw_version = version
+        registry = dr.async_get(self.hass)
+        for device in dr.async_entries_for_config_entry(
+            registry, self.config_entry.entry_id
+        ):
+            registry.async_update_device(device.id, sw_version=version)
 
     @callback
     def _handle_connection_state(self, connected: bool) -> None:
@@ -82,11 +108,15 @@ class Azur851Coordinator(DataUpdateCoordinator[DeviceState]):
     async def _async_update_data(self) -> DeviceState:
         """Ensure the connection is open; return the latest known state.
 
-        Called once on first refresh. After that, updates arrive via push, and
-        the connection reconnects on its own if the link drops.
+        Called on first refresh, and then on each poll for models that need it.
+        Updates arrive via push, and the connection reconnects on its own if the
+        link drops; poll replies also arrive via push.
         """
         try:
-            if not self.client.is_open:
+            if self.client.is_open:
+                await self.client.async_poll()
+            elif self.data is None:
+                # First refresh. Later on, a down link reconnects by itself.
                 await self.client.async_connect()
         except Azur851Error as err:
             raise UpdateFailed(f"Error connecting to Azur 851: {err}") from err

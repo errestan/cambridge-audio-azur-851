@@ -29,9 +29,17 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "headphones": {
+        "name": "Headphones"
+      }
+    },
     "number": {
       "balance": {
         "name": "Balance"
+      },
+      "headphone_volume": {
+        "name": "Headphone volume"
       }
     },
     "select": {
@@ -60,6 +68,14 @@
         }
       }
     },
+    "sensor": {
+      "sample_rate": {
+        "name": "Sample rate"
+      },
+      "bit_depth": {
+        "name": "Bit depth"
+      }
+    },
     "switch": {
       "direct": {
         "name": "Direct"
@@ -72,6 +88,9 @@
       },
       "phase_inverted": {
         "name": "Invert phase"
+      },
+      "trigger": {
+        "name": "Trigger out"
       }
     }
   }

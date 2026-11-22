@@ -30,7 +30,7 @@ from .exceptions import (
     Azur851NoResponseError,
     Azur851ProtocolError,
 )
-from .models import DeviceState, ModelCapabilities, get_model_capabilities
+from .models import DeviceState, ModelCapabilities, Source, get_model_capabilities
 from .protocol import Command, Response, decode, encode
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +38,10 @@ _LOGGER = logging.getLogger(__name__)
 # How long to wait for the device to answer a probe. The 851 replies within
 # milliseconds; this leaves headroom for a network serial proxy.
 PROBE_TIMEOUT: float = 2.0
+
+# How long after a source change or power-on to re-read the input signal, so
+# the device has time to lock onto it.
+FOLLOW_UP_DELAY: float = 2.0
 
 
 class Azur851Client:
@@ -64,6 +68,10 @@ class Azur851Client:
         self._probe_waiter: asyncio.Future[Response] | None = None
         # The last command sent, so a group-5 reply can say what it rejected.
         self._last_sent: Command | None = None
+        # Spaces commands out on models that need it (see CommandSet).
+        self._write_lock = asyncio.Lock()
+        self._last_write_at = 0.0
+        self._follow_up_task: asyncio.Task[None] | None = None
 
     @classmethod
     def from_config(cls, data: dict[str, Any]) -> Self:
@@ -77,6 +85,38 @@ class Azur851Client:
     def capabilities(self) -> ModelCapabilities:
         """Return the capability map for this model."""
         return self._capabilities
+
+    @property
+    def poll_interval(self) -> float | None:
+        """Return how often to call :meth:`async_poll` (None = never)."""
+        return self._commands.poll_interval
+
+    @property
+    def sources(self) -> dict[str, Source]:
+        """Return the selectable sources, using names set on the device.
+
+        The 851D reports the names its inputs have been given; until it does
+        (and on the amps), the default names are used.
+        """
+        names = self._state.source_names
+        if not names:
+            return self._capabilities.sources
+        sources: dict[str, Source] = {}
+        for default, source in self._capabilities.sources.items():
+            name = names.get(source.number, default)
+            if name in sources:
+                name = f"{name} ({source.number})"
+            sources[name] = source
+        return sources
+
+    def source_name(self, code: int | None, balanced: bool = False) -> str | None:
+        """Resolve a device input number (and socket) back to its name."""
+        if code is None:
+            return None
+        for name, source in self.sources.items():
+            if source.number == code and source.balanced in (None, balanced):
+                return name
+        return None
 
     @property
     def state(self) -> DeviceState:
@@ -136,8 +176,15 @@ class Azur851Client:
         for command in self._commands.state_queries():
             await self._write(command)
 
+    async def async_poll(self) -> None:
+        """Re-read values the device does not report when they change."""
+        for command in self._commands.poll_queries(self._state):
+            await self._write(command)
+
     async def async_close(self) -> None:
         """Close the underlying transport."""
+        if self._follow_up_task is not None:
+            self._follow_up_task.cancel()
         await self._connection.async_close()
 
     # --- Commands ----------------------------------------------------------
@@ -156,7 +203,7 @@ class Azur851Client:
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source by its configured name."""
-        selected = self._capabilities.sources.get(source)
+        selected = self.sources.get(source)
         if selected is None:
             raise Azur851Error(f"Unknown source for {self._model}: {source!r}")
         await self._write(self._commands.select_source(selected))
@@ -196,6 +243,29 @@ class Azur851Client:
             raise Azur851Error("The current filter is not known yet")
         await self._write(commands_851d.select_filter(Filter(filter_type), inverted))
 
+    async def async_set_trigger(self, high: bool) -> None:
+        """Set the 12 V trigger output high or low (851D only)."""
+        await self._write(commands_851d.set_trigger(high))
+
+    async def async_set_headphone_volume(self, level: int) -> None:
+        """Set the headphone volume as attenuation, 0 (0 dB) .. 96 (851D only).
+
+        The 851D can only step it up or down, so this steps from the current
+        level, which is read on connect.
+        """
+        current = self._state.headphone_volume
+        if current is None:
+            raise Azur851Error("The current headphone volume is not known yet")
+        level = max(commands_851d.VOLUME_MIN, min(commands_851d.VOLUME_MAX, level))
+        # Up means louder, i.e. less attenuation.
+        step = (
+            commands_851d.headphone_volume_up()
+            if level < current
+            else commands_851d.headphone_volume_down()
+        )
+        for _ in range(abs(current - level)):
+            await self._write(step)
+
     # --- Volume scaling helpers -------------------------------------------
 
     def _scale_to_device(self, fraction: float) -> int:
@@ -221,8 +291,16 @@ class Azur851Client:
 
     async def _write(self, command: Command) -> None:
         """Encode and send a command. The device answers via the read loop."""
-        self._last_sent = command
-        await self._connection.async_write(encode(command))
+        async with self._write_lock:
+            loop = asyncio.get_running_loop()
+            wait = self._last_write_at + self._commands.write_interval - loop.time()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_sent = command
+            try:
+                await self._connection.async_write(encode(command))
+            finally:
+                self._last_write_at = loop.time()
 
     def _forward_connection_state(self, connected: bool) -> None:
         """Relay the transport's up/down state to the coordinator."""
@@ -242,6 +320,25 @@ class Azur851Client:
             return
         if self.apply_update(response) and self.on_update is not None:
             self.on_update()
+        if follow_ups := self._commands.follow_ups(response):
+            self._schedule_follow_up(follow_ups)
+
+    def _schedule_follow_up(self, queries: list[Command]) -> None:
+        """Send ``queries`` after a short delay, replacing any pending ones."""
+        if self._follow_up_task is not None:
+            self._follow_up_task.cancel()
+        self._follow_up_task = asyncio.get_running_loop().create_task(
+            self._async_follow_up(queries)
+        )
+
+    async def _async_follow_up(self, queries: list[Command]) -> None:
+        """Wait for the device to settle, then send ``queries``."""
+        await asyncio.sleep(FOLLOW_UP_DELAY)
+        try:
+            for command in queries:
+                await self._write(command)
+        except Azur851Error as err:
+            _LOGGER.debug("Could not re-read %s state: %s", self._model, err)
 
     def _log_error(self, response: Response) -> None:
         """Log a group-5 error: a rejected command or a hardware fault."""

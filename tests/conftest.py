@@ -7,6 +7,8 @@ from collections.abc import Awaitable, Callable
 
 import pytest
 import serialx
+from custom_components.cambridge_azur851 import azur851
+from custom_components.cambridge_azur851.azur851.command_sets import DacCommandSet
 from custom_components.cambridge_azur851.const import (
     CONF_MODEL,
     CONF_SERIAL_URL,
@@ -20,6 +22,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading of the custom integration in every test."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def no_command_delays(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Send 851D commands without the gap and follow-up delay real hardware needs."""
+    monkeypatch.setattr(DacCommandSet, "write_interval", 0.0)
+    monkeypatch.setattr(azur851, "FOLLOW_UP_DELAY", 0.0)
 
 
 @pytest.fixture(autouse=True)

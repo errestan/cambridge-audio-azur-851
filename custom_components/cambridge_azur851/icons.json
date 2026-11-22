@@ -1,8 +1,19 @@
 {
   "entity": {
+    "binary_sensor": {
+      "headphones": {
+        "default": "mdi:headphones-off",
+        "state": {
+          "on": "mdi:headphones"
+        }
+      }
+    },
     "number": {
       "balance": {
         "default": "mdi:scale-balance"
+      },
+      "headphone_volume": {
+        "default": "mdi:headphones"
       }
     },
     "select": {
@@ -14,6 +25,14 @@
       },
       "filter": {
         "default": "mdi:sine-wave"
+      }
+    },
+    "sensor": {
+      "sample_rate": {
+        "default": "mdi:sine-wave"
+      },
+      "bit_depth": {
+        "default": "mdi:waveform"
       }
     },
     "switch": {
@@ -28,6 +47,9 @@
       },
       "phase_inverted": {
         "default": "mdi:swap-vertical"
+      },
+      "trigger": {
+        "default": "mdi:flash-triangle"
       }
     }
   }

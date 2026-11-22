@@ -73,12 +73,19 @@ unsolicited, the connection runs a background read loop and the integration is
 | Tape monitor / Record in (switch) | ✓ | ✓ | – | Named "Record in" on the 851E |
 | Filter (select) | – | – | ✓ | Linear phase, Minimum phase, Steep. The 851D remembers one per input |
 | Invert phase (switch) | – | – | ✓ | |
+| Trigger out (switch) | – | – | ✓ | The 12 V trigger output |
+| Headphone volume (number) | – | – | ✓ | −96 … 0 dB. Unavailable while no headphones are plugged in |
+| Headphones (binary sensor) | – | – | ✓ | Known after the first plug or unplug |
+| Sample rate, Bit depth (sensors) | – | – | ✓ | Diagnostic. Read after power-on and source changes, then every 30 s while on; unknown with no signal |
 
 The amps have no way to read a setting back; they report each one only when it
 changes (from Home Assistant, the remote or the front panel). Until it does,
 these entities show the value they had before Home Assistant restarted, marked
-as an *assumed state*. The 851D can be asked for its volume and filter, so those
-are read as soon as it connects.
+as an *assumed state*. The 851D can be asked for its volume, filter, headphone
+volume, input signal, versions and input names, so those are read as soon as it
+connects. Names you've given its inputs on the front panel are used as the
+media player's source names, and its software and DSP versions appear on the
+device page.
 
 ## Architecture
 
@@ -91,9 +98,11 @@ custom_components/cambridge_azur851/
 ├── coordinator.py       # Push coordinator: owns the connection, fans out updates
 ├── entity.py            # Base entities (device info, availability, restore)
 ├── media_player.py      # MediaPlayerEntity: power, volume, mute, source select
-├── number.py            # Balance
+├── number.py            # Balance, 851D headphone volume
 ├── select.py            # Speaker outputs, display brightness, 851D filter
-├── switch.py            # Direct, tape monitor / record in, 851D phase
+├── switch.py            # Direct, tape monitor / record in, 851D phase and trigger
+├── binary_sensor.py     # 851D headphones plugged in
+├── sensor.py            # 851D input sample rate and bit depth
 ├── icons.json           # Entity icons
 ├── brand/               # Integration icon and logo (light + dark), shown in HA
 ├── strings.json         # UI strings
@@ -184,6 +193,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the inline `TODO`s for the next imp
 - [x] Settings entities: balance, speakers, Direct, tape monitor, display brightness
 - [x] 851D support (its own command set; filter and phase entities)
 - [x] Validate the 851D on real hardware (all but volume, pre-amp mode was off)
+- [x] 851D extras: trigger out, headphones, headphone volume, sample rate, bit depth, input names, versions
 - [ ] Validate the 851E on real hardware
 
 ## License

@@ -152,10 +152,18 @@ Setup (group 2, replies on group 4): `01` software version, `02` DSP version,
 
 Sources: 1–4 Input 1–4, 5 BNC, 6 AES/EBU, 7 Bluetooth, 8 USB.
 
-Unlike the amps, volume and filter **can be read back** (`#1,12,` and
-`#1,41,`), so both are requested on every (re)connect. Power, mute, source,
-balance and brightness have no "get" and are learned from replies as on the
-amps. Setting the phase needs the current filter, since one command carries
+Unlike the amps, many values **can be read back**: volume, filter, word width,
+sample rate, headphone volume, software and DSP versions and the eight input
+names are all requested on every (re)connect. Power, mute, source, balance,
+brightness, headphones and trigger have no "get" and are learned from replies
+as on the amps. Word width and sample rate are not reported when they change,
+so they are re-read 2 s after power-on or a source change and every 30 s while
+the 851D is on. Headphone volume can only be stepped, so setting it sends
+up/down steps until it reaches the target.
+
+Codes: word width `01`–`09` = 16–24 bits; sample rate `01` 32 k, `02` 44.1 k,
+`03` 48 k, `04` 88.2 k, `05` 96 k, `06` 176.4 k, `07` 192 kHz; `00` = no valid
+signal for both. Setting the phase needs the current filter, since one command carries
 both.
 
 **Real-851D behaviour (tested on hardware):**
@@ -168,6 +176,15 @@ both.
   it reports the new input's filter (`#3,40,x,y`, twice).
 - It sometimes sends a NUL byte before a frame (`\x00#3,14,0`); the decoder
   strips it.
+- It **drops frames** when commands arrive back to back, so commands are sent
+  at least 50 ms apart.
+- It doesn't answer *get volume* in standby. Word width and headphone volume
+  are answered in standby (sample rate reads `00`), and the DSP version reads
+  `00.00` until it's on (`16.59` on the test unit; software `1.7`).
+- Input names come back padded to 8 characters, sometimes with a control byte
+  (`#4,05,1, TV     `, `#4,05,7,\x07 BTooth`); they are trimmed.
+- Headphone volume *up* (`#1,52`) makes it louder (less attenuation), as you'd
+  expect.
 
 ## Implementation implications
 

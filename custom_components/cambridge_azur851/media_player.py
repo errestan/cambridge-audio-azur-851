@@ -71,14 +71,14 @@ class Azur851MediaPlayer(Azur851Entity, MediaPlayerEntity):
     def source(self) -> str | None:
         """Return the currently selected source."""
         data = self.coordinator.data
-        return self.coordinator.client.capabilities.source_name(
+        return self.coordinator.client.source_name(
             data.source_code, data.source_balanced
         )
 
     @property
     def source_list(self) -> list[str]:
         """Return the list of selectable sources for this model."""
-        return list(self.coordinator.client.capabilities.sources)
+        return list(self.coordinator.client.sources)
 
     # --- Commands (write through the client) -------------------------------
 

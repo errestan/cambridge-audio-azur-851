@@ -45,6 +45,17 @@ class DeviceState:
     # 851D only; it can be read back, so it is known soon after connect.
     filter: int | None = None  # commands_851d.Filter value
     phase_inverted: bool | None = None
+    # More 851D-only values. The trigger and headphones are reported only when
+    # they change; the rest can be read back.
+    trigger: bool | None = None  # 12 V trigger output high
+    headphones: bool | None = None  # headphones plugged in
+    headphone_volume: int | None = None  # attenuation, 0 (0 dB) .. 96
+    word_width: int | None = None  # bits; None when there is no valid signal
+    sample_rate: int | None = None  # Hz; None when there is no valid signal
+    software_version: str | None = None
+    dsp_version: str | None = None
+    # Source number -> name as set on the device (851D).
+    source_names: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -76,6 +87,9 @@ class ModelCapabilities:
     has_display_brightness: bool = True
     has_speaker_select: bool = False
     has_filter: bool = False
+    has_trigger: bool = False
+    has_headphones: bool = False
+    has_signal_info: bool = False  # input word width and sample rate
     # Control #08: "tape_monitor" on the 851A, "record_in" on the 851E, or None.
     monitor: str | None = "tape_monitor"
     # Map of source name -> input (control command number + socket).
@@ -147,6 +161,9 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
         volume_inverted=True,
         has_direct=False,
         has_filter=True,
+        has_trigger=True,
+        has_headphones=True,
+        has_signal_info=True,
         monitor=None,
     ),
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/errestan/cambridge-audio-azur-851/compare/v0.2.1...v0.3.0) (2026-11-22)
+
+
+### Features
+
+* add Azur 851D support ([4ae9baf](https://github.com/errestan/cambridge-audio-azur-851/commit/4ae9bafb2ef121e2e4432401d7adf0f9d423b094))
+* add the 851D's trigger, headphones, signal info and input names ([6508eee](https://github.com/errestan/cambridge-audio-azur-851/commit/6508eee0056ed9450c608dbc276681d219bf3436))
+
 ## [0.2.1](https://github.com/errestan/cambridge-audio-azur-851/compare/v0.2.0...v0.2.1) (2026-11-18)
 
 

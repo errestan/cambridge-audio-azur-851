@@ -11,5 +11,5 @@ homeassistant==2026.10.4
 serialx>=1.8.2   # serial transport (local / socket:// / esphome:// proxy)
 
 # Linters (run via pre-commit in CI; listed here for local convenience).
-ruff>=0.17.5
+ruff>=0.17.6
 mypy>=2.4.1
